@@ -116,5 +116,8 @@ if [ -z "$ok" ]; then
   die "재시작 후 서버가 응답하지 않습니다. 위 로그 확인 후  sudo $0 --rollback  으로 되돌릴 수 있습니다."
 fi
 
-IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+# 인터페이스가 여러 개일 때 hostname -I 의 첫 값은 접근 불가능한 주소일 수 있다.
+# 기본 경로의 출발지 IP를 우선 사용한다. (install.sh 와 동일한 로직)
+IP="$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1); exit}}')"
+[ -n "$IP" ] || IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 printf '\n\033[1;32m업데이트 완료\033[0m  ->  http://%s:%s/\n\n' "${IP:-<서버IP>}" "$PORT"
