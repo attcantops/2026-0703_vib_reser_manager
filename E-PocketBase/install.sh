@@ -35,11 +35,21 @@ missing=""
 for c in curl unzip git; do command -v "$c" >/dev/null 2>&1 || missing="$missing $c"; done
 if [ -n "$missing" ]; then
   echo "설치할 패키지:$missing"
-  if   command -v apt-get >/dev/null 2>&1; then apt-get update -qq && apt-get install -y $missing
-  elif command -v dnf     >/dev/null 2>&1; then dnf install -y $missing
-  elif command -v opkg    >/dev/null 2>&1; then opkg update && opkg install $missing
+  # 이 스크립트는 `curl ... | sudo bash` 로 실행된다. 그 경우 stdin 은 스크립트 본문
+  # 자체이므로, stdin 을 읽는 명령(apt-get 등)이 남은 스크립트를 삼켜 설치가 중간에
+  # 깨진다. 그래서 apt 계열은 반드시 stdin 을 /dev/null 로 막고 비대화형으로 돌린다.
+  export DEBIAN_FRONTEND=noninteractive
+  if   command -v apt-get >/dev/null 2>&1; then
+    apt-get update -qq </dev/null && apt-get install -y -qq $missing </dev/null
+  elif command -v dnf >/dev/null 2>&1; then
+    dnf install -y $missing </dev/null
+  elif command -v opkg >/dev/null 2>&1; then
+    opkg update </dev/null && opkg install $missing </dev/null
   else die "패키지 관리자를 찾을 수 없습니다. 다음을 직접 설치하세요:$missing"
   fi
+  for c in curl unzip git; do
+    command -v "$c" >/dev/null 2>&1 || die "$c 설치에 실패했습니다. 직접 설치 후 다시 실행하세요."
+  done
 fi
 
 # ── 2. 아키텍처 판별 ─────────────────────────────────────────
