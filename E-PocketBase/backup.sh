@@ -77,7 +77,20 @@ if [ -n "$PUSH" ]; then
   [ -f "$CONF" ] || die "원격 설정이 없습니다: $CONF (REMOTE= 항목을 적어주세요)"
   # shellcheck source=/dev/null
   . "$CONF"
-  [ -n "${REMOTE:-}" ] || die "$CONF 에 REMOTE 가 비어 있습니다"
+
+  # 외부에서 끌어가는(pull) 방식으로 구성한 경우.
+  # 윈도우처럼 SSH 서버가 없는 수신처는 이 장치가 밀어넣을 수 없어서,
+  # 상대가 주기적으로 가져가는 구성을 쓴다. 그 경우를 명시적으로 표시해 둔다.
+  # 아무 설정도 없는 상태를 조용히 성공으로 넘기지 않기 위해, 반드시 둘 중
+  # 하나(REMOTE 또는 EXTERNAL_PULL)를 적어야 한다.
+  if [ -z "${REMOTE:-}" ] && [ "${EXTERNAL_PULL:-}" = "1" ]; then
+    log "외부 회수(pull) 방식으로 구성됨 — 이 장치에서는 전송하지 않습니다."
+    log "  수신처가 실제로 가져가고 있는지는 그쪽에서 확인해야 합니다."
+    log "완료"
+    exit 0
+  fi
+
+  [ -n "${REMOTE:-}" ] || die "$CONF 에 REMOTE 도 EXTERNAL_PULL 도 설정돼 있지 않습니다. 백업이 이 장치에만 남습니다."
   log "원격 전송: $REMOTE"
   SCP_OPTS="-o BatchMode=yes -o ConnectTimeout=15"
   [ -n "${SSH_KEY:-}" ] && SCP_OPTS="$SCP_OPTS -i $SSH_KEY"
