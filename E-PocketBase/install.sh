@@ -140,8 +140,16 @@ for i in $(seq 1 20); do
 done
 [ -n "$ok" ] || { journalctl -u "$SERVICE" -n 30 --no-pager || true; die "서버가 뜨지 않았습니다. 위 로그를 확인하세요."; }
 
-IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+# 접속 주소로 안내할 IP 결정.
+# hostname -I 의 첫 번째 값을 그냥 쓰면, 인터페이스가 여러 개일 때
+# 실제로는 접근 불가능한 주소(예: 별도 대역의 eth0)를 안내하게 된다.
+# 기본 경로로 나갈 때 사용되는 출발지 IP를 우선 사용한다.
+IP="$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1); exit}}')"
+[ -n "$IP" ] || IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 [ -n "$IP" ] || IP="<서버IP>"
+
+# 인터페이스가 여러 개면 모든 주소를 함께 보여준다.
+ALL_IP="$(hostname -I 2>/dev/null)"
 
 # 색상은 printf 로 낸다. cat 히어독 안에서는 \033 이 글자 그대로 출력된다.
 printf '\n\033[1;32m========== 설치 완료 ==========\033[0m\n'
@@ -150,6 +158,9 @@ cat <<EOF
 
   예약 화면    http://${IP}:${PORT}/
   관리자 화면  http://${IP}:${PORT}/_/
+
+  (이 서버의 전체 IP: ${ALL_IP})
+  위 주소로 안 열리면 다른 IP로도 시도해 보세요.
 
 다음 할 일 (최초 1회):
   1) 관리자 화면에 접속해 관리자 이메일/비밀번호를 만드세요.
