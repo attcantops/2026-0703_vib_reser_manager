@@ -114,14 +114,37 @@ mkdir -p "$APP_DIR/pb_data"
 install -m 755 "$SRC_DIR/update.sh" "$APP_DIR/update.sh"
 install -m 755 "$SRC_DIR/backup.sh" "$APP_DIR/backup.sh"
 
-# 백업 cron 등록. PocketBase 내장 백업(03:00)이 끝난 뒤 03:10 에 장치 바깥으로 내보낸다.
+# 백업 예약. PocketBase 내장 백업(03:00)이 끝난 뒤 03:10 에 장치 바깥으로 내보낸다.
 # 내장 백업만으로는 pb_data 안, 즉 같은 SD카드에만 남아 SD 손상 시 함께 사라진다.
-if ! crontab -l 2>/dev/null | grep -q "vibres/backup.sh"; then
-  ( crontab -l 2>/dev/null; \
-    echo "10 3 * * * $APP_DIR/backup.sh --push >> /var/log/vibres-backup.log 2>&1" \
-  ) | crontab -
-  echo "  백업 cron 등록됨 (매일 03:10)"
-fi
+#
+# cron 대신 systemd 타이머를 쓴다. crontab 은 "root 크론탭이 아직 없는" 첫 설치에서
+# `crontab -l` 이 실패해 set -e 로 스크립트가 죽는다(실제로 겪음). systemd 는 이미
+# 서비스 등록에 쓰고 있어 추가 의존성도 없다.
+cat > /etc/systemd/system/vibres-backup.service <<EOF
+[Unit]
+Description=진동시험기 예약 백업 (장치 외부로 전송)
+
+[Service]
+Type=oneshot
+ExecStart=${APP_DIR}/backup.sh --push
+EOF
+
+cat > /etc/systemd/system/vibres-backup.timer <<'EOF'
+[Unit]
+Description=진동시험기 예약 백업 타이머 (매일 03:10)
+
+[Timer]
+OnCalendar=*-*-* 03:10:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
+systemctl daemon-reload
+systemctl enable vibres-backup.timer >/dev/null 2>&1 || true
+systemctl start vibres-backup.timer >/dev/null 2>&1 || true
+echo "  백업 타이머 등록됨 (매일 03:10)"
 # 원격 대상 설정 파일 뼈대 (비어 있으면 --push 가 실패하며 경고한다)
 if [ ! -f "$APP_DIR/backup.conf" ]; then
   cat > "$APP_DIR/backup.conf" <<'CONF'
