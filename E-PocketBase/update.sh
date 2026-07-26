@@ -14,8 +14,10 @@
 # 예약 데이터(/opt/vibres/pb_data)는 건드리지 않는다.
 #
 # 옵션
-#   --pb           PocketBase 실행파일도 최신 버전으로 함께 갱신
-#   --rollback     직전 커밋으로 되돌리고 재시작
+#   --pb           PocketBase 실행파일을 검증된 고정 버전으로 갱신
+#                  (다른 버전으로 올리려면 PB_VERSION=0.40.0 처럼 명시)
+#   --rollback     소스를 직전 커밋으로 되돌리고 재시작
+#   --rollback-pb  PocketBase 실행파일을 --pb 직전 버전으로 되돌리고 재시작
 
 set -euo pipefail
 
@@ -30,14 +32,37 @@ die() { printf '\n\033[1;31m[오류] %s\033[0m\n' "$*" >&2; exit 1; }
 [ "$(id -u)" -eq 0 ] || die "root 권한이 필요합니다.  sudo $0 로 실행하세요."
 [ -d "$APP_DIR/repo/.git" ] || die "설치본을 찾을 수 없습니다. install.sh 를 먼저 실행하세요."
 
-DO_PB=""; DO_ROLLBACK=""
+# PocketBase 기본 버전은 install.sh 와 같은 "검증된 값"으로 고정한다.
+# 여기만 latest 를 받아오면 --pb 경로로 핀이 무력화된다.
+PB_PIN="0.39.9"
+
+DO_PB=""; DO_ROLLBACK=""; DO_ROLLBACK_PB=""
 for a in "$@"; do
   case "$a" in
     --pb) DO_PB=1 ;;
     --rollback) DO_ROLLBACK=1 ;;
+    --rollback-pb) DO_ROLLBACK_PB=1 ;;
     *) die "알 수 없는 옵션: $a" ;;
   esac
 done
+
+# ── 실행파일 롤백 ────────────────────────────────────────────
+# --pb 는 바이너리를 덮어쓰므로, 이전 파일을 남겨두지 않으면 되돌릴 수단이 없다.
+if [ -n "$DO_ROLLBACK_PB" ]; then
+  [ -f "$APP_DIR/pocketbase.prev" ] \
+    || die "되돌릴 이전 실행파일이 없습니다 ($APP_DIR/pocketbase.prev). --pb 를 실행한 적이 없습니다."
+  log "PocketBase 실행파일을 이전 버전으로 되돌리기"
+  cp -a "$APP_DIR/pocketbase" "$APP_DIR/pocketbase.failed"
+  mv -f "$APP_DIR/pocketbase.prev" "$APP_DIR/pocketbase"
+  chmod 755 "$APP_DIR/pocketbase"
+  echo "  $("$APP_DIR/pocketbase" --version)"
+  systemctl restart "$SERVICE"
+  sleep 3
+  systemctl is-active --quiet "$SERVICE" \
+    && printf '\n\033[1;32m실행파일 롤백 완료\033[0m\n\n' \
+    || die "롤백 후에도 서비스가 뜨지 않습니다. journalctl -u $SERVICE -n 40 확인하세요."
+  exit 0
+fi
 
 BEFORE="$(git -C "$APP_DIR/repo" rev-parse --short HEAD)"
 
@@ -76,18 +101,38 @@ if [ -n "$DO_PB" ]; then
     x86_64|amd64)  PB_ARCH="amd64" ;;
     *) die "지원하지 않는 아키텍처: $(uname -m)" ;;
   esac
-  V="${PB_VERSION:-$(curl -fsSL https://api.github.com/repos/pocketbase/pocketbase/releases/latest \
-      | grep -o '"tag_name": *"v[^"]*"' | head -1 | sed 's/.*"v\([^"]*\)".*/\1/')}"
+  # 기본값은 검증된 고정 버전. 최신을 원하면 PB_VERSION=latest 로 명시한다.
+  V="${PB_VERSION:-$PB_PIN}"
+  if [ "$V" = "latest" ]; then
+    echo "  주의: 검증되지 않은 최신 버전을 받습니다."
+    V="$(curl -fsSL https://api.github.com/repos/pocketbase/pocketbase/releases/latest \
+        | grep -o '"tag_name": *"v[^"]*"' | head -1 | sed 's/.*"v\([^"]*\)".*/\1/')"
+  fi
   [ -n "$V" ] || die "버전 조회 실패"
+  echo "  대상 버전: v$V (현재: $("$APP_DIR/pocketbase" --version 2>/dev/null))"
+
   tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
   curl -fsSL -o "$tmp/pb.zip" \
     "https://github.com/pocketbase/pocketbase/releases/download/v${V}/pocketbase_${V}_linux_${PB_ARCH}.zip" \
     || die "다운로드 실패"
   unzip -oq "$tmp/pb.zip" -d "$tmp"
-  # 업그레이드 직전 DB 백업 (되돌릴 수 있게)
-  cp -a "$APP_DIR/pb_data/data.db" "$APP_DIR/pb_data/data.db.bak-$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
+
+  # 업그레이드 직전 백업.
+  # 예전에는 여기서 data.db 를 raw cp 했으나, 서비스가 돌아가는 중의 복사라
+  # -wal 파일이 빠져 최근 예약이 누락되거나 깨진 사본이 될 수 있었다.
+  # backup.sh 는 sqlite3 .backup 으로 일관된 스냅샷을 만들고 무결성까지 확인한다.
+  if [ -x "$APP_DIR/backup.sh" ]; then
+    log "업그레이드 전 백업"
+    "$APP_DIR/backup.sh" || die "업그레이드 전 백업에 실패했습니다. 업그레이드를 중단합니다."
+  else
+    die "backup.sh 가 없습니다. 백업 없이 업그레이드하지 않습니다."
+  fi
+
+  # 되돌릴 수 있도록 현재 실행파일을 보관한다 (--rollback-pb 가 이걸 쓴다).
+  cp -a "$APP_DIR/pocketbase" "$APP_DIR/pocketbase.prev"
   install -m 755 "$tmp/pocketbase" "$APP_DIR/pocketbase"
-  echo "  $("$APP_DIR/pocketbase" --version)"
+  echo "  갱신됨: $("$APP_DIR/pocketbase" --version)"
+  echo "  문제가 생기면: sudo $APP_DIR/update.sh --rollback-pb"
 fi
 
 # ── 자기 자신 갱신 ───────────────────────────────────────────
