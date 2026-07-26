@@ -5,7 +5,10 @@
 # 설치 이후에는 담당자를 부를 필요 없이, SSH 로 접속해서 이것만 실행하면 된다.
 #
 #   ssh <계정>@<서버IP>
-#   sudo /opt/vibres/repo/E-PocketBase/update.sh
+#   sudo /opt/vibres/update.sh
+#
+# 반드시 /opt/vibres/update.sh (저장소 바깥)를 실행한다. 저장소 안의 사본을
+# 직접 실행하면 --rollback 시 스크립트가 스스로 지워질 수 있다.
 #
 # 하는 일: 최신 소스 pull -> 서비스 재시작 -> 정상 기동 확인
 # 예약 데이터(/opt/vibres/pb_data)는 건드리지 않는다.
@@ -40,10 +43,19 @@ BEFORE="$(git -C "$APP_DIR/repo" rev-parse --short HEAD)"
 
 if [ -n "$DO_ROLLBACK" ]; then
   log "직전 커밋으로 롤백"
+  # 얕은 복제(shallow clone)면 HEAD~1 이 없을 수 있으므로 이력을 먼저 확보한다.
+  if ! git -C "$APP_DIR/repo" rev-parse --verify -q HEAD~1 >/dev/null; then
+    echo "  이력이 부족해 추가로 받는 중..."
+    git -C "$APP_DIR/repo" fetch --deepen 10 origin main 2>/dev/null \
+      || git -C "$APP_DIR/repo" fetch --unshallow origin main 2>/dev/null || true
+  fi
+  git -C "$APP_DIR/repo" rev-parse --verify -q HEAD~1 >/dev/null \
+    || die "되돌릴 이전 커밋이 없습니다 (현재가 최초 커밋)."
   git -C "$APP_DIR/repo" reset --hard HEAD~1
 else
   log "최신 소스 받기"
-  git -C "$APP_DIR/repo" fetch --depth 1 origin main
+  # depth 1 로 받으면 이력이 잘려 나중에 롤백이 불가능해진다.
+  git -C "$APP_DIR/repo" fetch --depth 20 origin main
   git -C "$APP_DIR/repo" reset --hard origin/main
 fi
 
@@ -76,6 +88,17 @@ if [ -n "$DO_PB" ]; then
   cp -a "$APP_DIR/pb_data/data.db" "$APP_DIR/pb_data/data.db.bak-$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
   install -m 755 "$tmp/pocketbase" "$APP_DIR/pocketbase"
   echo "  $("$APP_DIR/pocketbase" --version)"
+fi
+
+# ── 자기 자신 갱신 ───────────────────────────────────────────
+# 이 스크립트는 /opt/vibres/update.sh (저장소 바깥)에서 실행된다.
+# 저장소 쪽에 새 버전이 있으면 가져다 둔다. 실행 중인 파일을 직접 덮으면
+# bash 가 나머지를 잘못 읽을 수 있으므로, 임시파일에 쓴 뒤 mv 로 교체한다.
+if [ -f "$SRC_DIR/update.sh" ] && ! cmp -s "$SRC_DIR/update.sh" "$APP_DIR/update.sh"; then
+  cp "$SRC_DIR/update.sh" "$APP_DIR/update.sh.new"
+  chmod 755 "$APP_DIR/update.sh.new"
+  mv -f "$APP_DIR/update.sh.new" "$APP_DIR/update.sh"
+  echo "  update.sh 자체도 갱신됨 (다음 실행부터 적용)"
 fi
 
 # ── 재시작 ───────────────────────────────────────────────────
