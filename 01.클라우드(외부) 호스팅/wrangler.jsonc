@@ -1,0 +1,24 @@
+{
+  // Cloudflare Workers 설정 파일
+  // database_id 는 `npx wrangler d1 create vibration-reservation` 실행 후 나오는 값으로 교체하세요.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vibration-reservation",
+  "main": "src/index.js",
+  "compatibility_date": "2025-01-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"],
+    "not_found_handling": "single-page-application"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "vibration-reservation",
+      "database_id": "1bee45fc-5bc7-42a4-856c-daff3f235b70"
+    }
+  ],
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "tasks": {
+    "dev": "deno run --unstable-kv --allow-net --allow-read --watch main.ts",
+    "start": "deno run --unstable-kv --allow-net --allow-read main.ts"
+  },
+  "//": "Deno KV는 버전에 따라 --unstable-kv 플래그가 필요할 수 있습니다(설치방법.md 참고). 최신 Deno에서 KV가 안정화되면 플래그 없이도 동작합니다.",
+  "imports": {},
+  "fmt": {
+    "useTabs": false,
+    "lineWidth": 100,
+    "indentWidth": 2,
+    "semiColons": true,
+    "singleQuote": false
+  }
+}

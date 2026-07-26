@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>진동시험기 예약</title>
+<style>
+  :root {
+    --bg: #f4f6f9;
+    --card: #ffffff;
+    --line: #e2e6ec;
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --free: #ffffff;
+    --busy: #fde2e2;
+    --busy-line: #f5b5b5;
+    --sel: #d7e6ff;
+    --sel-line: #2563eb;
+    --text: #1f2937;
+    --muted: #6b7280;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 8px 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.03);
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 4px; flex: 1 1 140px; }
+  label { font-size: 13px; color: var(--muted); font-weight: 600; }
+  input, select {
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: inherit;
+    background: #fff;
+    color: var(--text);
+  }
+  input:focus, select:focus { outline: 2px solid var(--primary); border-color: var(--primary); }
+  .machine-fixed {
+    padding: 10px; background: #eef2ff; border-radius: 8px;
+    font-weight: 700; color: var(--primary-dark); font-size: 15px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .slot {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 6px;
+    text-align: center;
+    cursor: pointer;
+    background: var(--free);
+    user-select: none;
+    transition: transform .05s;
+    min-height: 58px;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .slot:active { transform: scale(.97); }
+  .slot .t { font-weight: 700; font-size: 14px; }
+  .slot .n { font-size: 12px; color: var(--muted); margin-top: 2px; word-break: break-all; }
+  .slot.busy { background: var(--busy); border-color: var(--busy-line); cursor: pointer; }
+  .slot.busy .n { color: #b02a2a; font-weight: 600; }
+  .slot.sel { background: var(--sel); border-color: var(--sel-line); box-shadow: inset 0 0 0 1px var(--sel-line); }
+  .legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted); margin: 12px 0 4px; flex-wrap: wrap; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--line); display: inline-block; }
+  .dot.free { background: var(--free); }
+  .dot.busy { background: var(--busy); border-color: var(--busy-line); }
+  .dot.sel { background: var(--sel); border-color: var(--sel-line); }
+  button {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 18px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  button:hover { background: var(--primary-dark); }
+  button:disabled { background: #9ca3af; cursor: not-allowed; }
+  .msg { padding: 10px 12px; border-radius: 8px; font-size: 14px; margin-top: 12px; display: none; }
+  .msg.ok { background: #dcfce7; color: #166534; display: block; }
+  .msg.err { background: #fee2e2; color: #991b1b; display: block; }
+  .msg.info { background: #dbeafe; color: #1e40af; display: block; }
+  .sel-info { font-size: 13px; color: var(--muted); margin-top: 10px; }
+  .foot { font-size: 12px; color: var(--muted); text-align: center; margin-top: 20px; }
+  .foot code { background: #eef2ff; padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>진동시험기 예약</h1>
+  <div class="sub">사내 공용 진동시험기 시간 예약 · 이름으로 예약/취소</div>
+
+  <!-- 조회 조건 -->
+  <div class="card">
+    <div class="row">
+      <div class="field">
+        <label>장비</label>
+        <div id="machineBox"></div>
+      </div>
+      <div class="field">
+        <label for="date">날짜</label>
+        <input type="date" id="date">
+      </div>
+      <div class="field" style="flex:0 0 auto;">
+        <label>&nbsp;</label>
+        <button id="btnReload" type="button" style="background:#e5e7eb;color:#374151;">새로고침</button>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span><i class="dot free"></i> 예약가능(클릭 선택)</span>
+      <span><i class="dot sel"></i> 선택됨</span>
+      <span><i class="dot busy"></i> 예약됨(클릭 취소)</span>
+    </div>
+
+    <div class="grid" id="grid"></div>
+    <div class="sel-info" id="selInfo"></div>
+  </div>
+
+  <!-- 예약 폼 -->
+  <div class="card">
+    <div class="row">
+      <div class="field">
+        <label for="name">이름 <span style="color:#dc2626">*</span></label>
+        <input type="text" id="name" placeholder="예약자 이름" autocomplete="name">
+      </div>
+      <div class="field">
+        <label for="dept">부서</label>
+        <input type="text" id="dept" placeholder="(선택)">
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px;">
+      <div class="field">
+        <label for="memo">메모</label>
+        <input type="text" id="memo" placeholder="(선택)">
+      </div>
+      <div class="field">
+        <label for="email">이메일</label>
+        <input type="email" id="email" placeholder="(선택)">
+      </div>
+    </div>
+    <div class="row" style="margin-top:14px;">
+      <button id="btnReserve" type="button" style="flex:1 1 auto;">예약하기</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <div class="foot">
+    데이터는 PocketBase 백엔드에 저장됩니다. 관리자는 <code>/_/</code> 페이지에서 예약을 직접 편집/삭제할 수 있습니다.<br>
+    (통계 · CSV · 반복예약 기능은 생략 — 확장 가능)
+  </div>
+</div>
+
+<!-- PocketBase JS SDK (UMD, CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/pocketbase@0.21.5/dist/pocketbase.umd.js"></script>
+<script>
+/* ============================================================
+   설정 (CONFIG)
+   ============================================================ */
+const CONFIG = {
+  machines: ['진동시험기 1호'],
+  startHour: 8,     // 예약 시작 가능 시각
+  endHour: 20,      // 예약 가능 시각은 8..19 (endHour 미만)
+  maxHours: 8,      // 연속 최대 예약 시간
+  collection: 'reservations',
+};
+
+// 같은 서버가 pb_public 을 서빙하므로 origin 그대로 사용
+const pb = new PocketBase(window.location.origin);
+
+/* ============================================================
+   상태
+   ============================================================ */
+let currentMachine = CONFIG.machines[0];
+let currentRecords = [];        // 현재 machine+date 예약 레코드
+let selectedHours = new Set();  // 사용자가 선택한(예약 대기) 시각들
+
+/* ============================================================
+   DOM
+   ============================================================ */
+const $ = (id) => document.getElementById(id);
+const gridEl = $('grid');
+const msgEl = $('msg');
+const selInfoEl = $('selInfo');
+
+/* ============================================================
+   초기화
+   ============================================================ */
+function todayStr() {
+  const d = new Date();
+  const off = d.getTimezoneOffset();
+  const local = new Date(d.getTime() - off * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+function initMachineBox() {
+  const box = $('machineBox');
+  if (CONFIG.machines.length === 1) {
+    box.innerHTML = '<div class="machine-fixed">' + esc(CONFIG.machines[0]) + '</div>';
+    currentMachine = CONFIG.machines[0];
+  } else {
+    const sel = document.createElement('select');
+    CONFIG.machines.forEach(m => {
+      const o = document.createElement('option');
+      o.value = m; o.textContent = m;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', () => { currentMachine = sel.value; loadReservations(); });
+    box.innerHTML = '';
+    box.appendChild(sel);
+    currentMachine = CONFIG.machines[0];
+  }
+}
+
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+/* ============================================================
+   메시지
+   ============================================================ */
+function showMsg(text, kind) {
+  msgEl.textContent = text;
+  msgEl.className = 'msg ' + (kind || 'info');
+}
+function clearMsg() { msgEl.className = 'msg'; msgEl.textContent = ''; }
+
+/* ============================================================
+   1) 예약현황 조회
+   ============================================================ */
+async function loadReservations() {
+  const date = $('date').value;
+  if (!date) return;
+  selectedHours.clear();
+  gridEl.innerHTML = '<div style="grid-column:1/-1;color:#6b7280;padding:8px;">불러오는 중...</div>';
+  try {
+    const filter = `machine="${currentMachine}" && date="${date}"`;
+    currentRecords = await pb.collection(CONFIG.collection).getFullList({
+      filter: filter,
+      sort: 'hour',
+    });
+    renderGrid();
+    updateSelInfo();
+    clearMsg();
+  } catch (err) {
+    gridEl.innerHTML = '';
+    showMsg('예약현황을 불러오지 못했습니다: ' + fmtErr(err), 'err');
+  }
+}
+
+function recordAt(hour) {
+  return currentRecords.find(r => Number(r.hour) === hour);
+}
+
+function renderGrid() {
+  gridEl.innerHTML = '';
+  for (let h = CONFIG.startHour; h < CONFIG.endHour; h++) {
+    const rec = recordAt(h);
+    const div = document.createElement('div');
+    div.className = 'slot' + (rec ? ' busy' : '') + (selectedHours.has(h) ? ' sel' : '');
+    div.dataset.hour = h;
+
+    const timeLabel = pad2(h) + ':00~' + pad2(h + 1) + ':00';
+    let inner = '<div class="t">' + timeLabel + '</div>';
+    if (rec) {
+      inner += '<div class="n">' + esc(rec.name) + (rec.dept ? ' (' + esc(rec.dept) + ')' : '') + '</div>';
+    } else {
+      inner += '<div class="n">예약가능</div>';
+    }
+    div.innerHTML = inner;
+
+    div.addEventListener('click', () => onSlotClick(h));
+    gridEl.appendChild(div);
+  }
+}
+
+/* ============================================================
+   슬롯 클릭: 빈칸=선택토글 / 예약됨=취소
+   ============================================================ */
+function onSlotClick(hour) {
+  const rec = recordAt(hour);
+  if (rec) {
+    cancelReservation(rec);
+  } else {
+    if (selectedHours.has(hour)) selectedHours.delete(hour);
+    else selectedHours.add(hour);
+    renderGrid();
+    updateSelInfo();
+  }
+}
+
+function updateSelInfo() {
+  if (selectedHours.size === 0) {
+    selInfoEl.textContent = '예약할 시간을 그리드에서 선택하세요.';
+    return;
+  }
+  const arr = [...selectedHours].sort((a, b) => a - b);
+  const label = arr.map(h => pad2(h) + '시').join(', ');
+  selInfoEl.textContent = '선택한 시간: ' + label + ' (총 ' + arr.length + '시간)';
+}
+
+/* ============================================================
+   2) 예약 (여러 시간 한번에)
+   검증: 비어있지않음 / maxHours 이내 / 연속 / 충돌
+   ============================================================ */
+function validateSelection(hours) {
+  if (hours.length === 0) return '예약할 시간을 선택하세요.';
+  if (hours.length > CONFIG.maxHours) return '연속 최대 ' + CONFIG.maxHours + '시간까지만 예약할 수 있습니다.';
+  // 연속 검사
+  const sorted = [...hours].sort((a, b) => a - b);
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] !== sorted[i - 1] + 1) return '연속된 시간만 한번에 예약할 수 있습니다. (선택한 시간이 떨어져 있음)';
+  }
+  return null;
+}
+
+async function reserve() {
+  clearMsg();
+  const name = $('name').value.trim();
+  if (!name) { showMsg('이름을 입력하세요. (필수)', 'err'); $('name').focus(); return; }
+
+  const hours = [...selectedHours].sort((a, b) => a - b);
+  const vErr = validateSelection(hours);
+  if (vErr) { showMsg(vErr, 'err'); return; }
+
+  const date = $('date').value;
+  const dept = $('dept').value.trim();
+  const memo = $('memo').value.trim();
+  const email = $('email').value.trim();
+
+  const btn = $('btnReserve');
+  btn.disabled = true;
+  btn.textContent = '예약 중...';
+
+  const created = [];
+  const failedBusy = [];
+  let otherErr = null;
+
+  for (const h of hours) {
+    const data = {
+      machine: currentMachine, date: date, hour: h,
+      name: name, dept: dept, memo: memo, email: email,
+    };
+    try {
+      await pb.collection(CONFIG.collection).create(data);
+      created.push(h);
+    } catch (err) {
+      // unique 제약 위반(중복예약) 판별
+      if (isUniqueError(err)) {
+        failedBusy.push(h);
+      } else {
+        otherErr = err;
+        break;
+      }
+    }
+  }
+
+  btn.disabled = false;
+  btn.textContent = '예약하기';
+
+  await loadReservations();
+
+  if (otherErr) {
+    showMsg('예약 중 오류가 발생했습니다: ' + fmtErr(otherErr), 'err');
+    return;
+  }
+  if (failedBusy.length > 0 && created.length === 0) {
+    showMsg('이미 예약된 시간입니다: ' + failedBusy.map(h => pad2(h) + '시').join(', '), 'err');
+  } else if (failedBusy.length > 0) {
+    showMsg('일부 예약 완료(' + created.map(h => pad2(h) + '시').join(', ') +
+            '). 이미 예약되어 실패한 시간: ' + failedBusy.map(h => pad2(h) + '시').join(', '), 'info');
+  } else {
+    showMsg('예약이 완료되었습니다: ' + created.map(h => pad2(h) + '시').join(', ') +
+            ' (' + esc(name) + '님)', 'ok');
+  }
+}
+
+/* ============================================================
+   3) 취소 (예약 id + 이름 일치해야 취소)
+   ============================================================ */
+async function cancelReservation(rec) {
+  const inputName = $('name').value.trim();
+  const timeLabel = pad2(rec.hour) + ':00~' + pad2(Number(rec.hour) + 1) + ':00';
+
+  if (!inputName) {
+    showMsg('취소하려면 하단 이름 칸에 예약자 이름을 입력하세요. (' + timeLabel + ' 예약자: ' + esc(rec.name) + ')', 'err');
+    return;
+  }
+  if (inputName !== rec.name) {
+    showMsg('예약자 이름이 일치하지 않아 취소할 수 없습니다. (' + timeLabel + ' 예약자: ' + esc(rec.name) + ')', 'err');
+    return;
+  }
+  if (!confirm(timeLabel + ' 예약(' + rec.name + ')을 취소할까요?')) return;
+
+  try {
+    await pb.collection(CONFIG.collection).delete(rec.id);
+    await loadReservations();
+    showMsg(timeLabel + ' 예약을 취소했습니다.', 'ok');
+  } catch (err) {
+    showMsg('취소 중 오류가 발생했습니다: ' + fmtErr(err), 'err');
+  }
+}
+
+/* ============================================================
+   오류 헬퍼
+   ============================================================ */
+function isUniqueError(err) {
+  // PocketBase 는 unique 제약 위반 시 보통 400 + 필드 validation(코드 validation_not_unique)
+  try {
+    const s = JSON.stringify(err && err.data ? err.data : err).toLowerCase();
+    if (s.includes('not_unique') || s.includes('unique')) return true;
+  } catch (e) {}
+  const msg = ((err && err.message) || '').toLowerCase();
+  return msg.includes('unique');
+}
+
+function fmtErr(err) {
+  if (err && err.data && err.data.message) return err.data.message;
+  if (err && err.message) return err.message;
+  return String(err);
+}
+
+/* ============================================================
+   (선택) 확장 가능: 기간+이름 조회목록
+   예) pb.collection('reservations').getFullList({
+         filter: `name="홍길동" && date>="2026-07-01" && date<="2026-07-31"` })
+   통계 / CSV 내보내기 / 반복예약 등도 여기에 추가 가능.
+   ============================================================ */
+
+/* ============================================================
+   이벤트 바인딩
+   ============================================================ */
+initMachineBox();
+$('date').value = todayStr();
+$('date').addEventListener('change', loadReservations);
+$('btnReload').addEventListener('click', loadReservations);
+$('btnReserve').addEventListener('click', reserve);
+
+loadReservations();
+</script>
+</body>
+</html>

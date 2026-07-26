@@ -1,0 +1,16 @@
+{
+  "name": "vibration-reservation",
+  "private": true,
+  "version": "1.0.0",
+  "description": "진동시험기 예약 B안 - Cloudflare Workers + D1",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:local": "wrangler d1 execute vibration-reservation --local --file=./schema.sql",
+    "db:remote": "wrangler d1 execute vibration-reservation --remote --file=./schema.sql",
+    "db:seed": "wrangler d1 execute vibration-reservation --local --file=./seed.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

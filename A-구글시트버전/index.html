@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <base target="_top">
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, "Malgun Gothic", "맑은 고딕", sans-serif; margin: 0; background: #f4f6fb; color: #1f2937; }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
+    header { text-align: center; padding: 20px 0 8px; }
+    header h1 { margin: 0; font-size: 22px; }
+    header p { margin: 6px 0 0; color: #6b7280; font-size: 13px; }
+    .card { background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 14px; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    label { font-size: 13px; color: #374151; font-weight: 600; }
+    select, input[type=date], input[type=month], input[type=text] { padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 15px; width: 100%; }
+    .field { flex: 1; min-width: 120px; }
+
+    .tabs { display: flex; gap: 6px; background: #eef2ff; padding: 4px; border-radius: 12px; }
+    .tab { flex: 1; text-align: center; padding: 10px; border-radius: 9px; cursor: pointer; font-weight: 700; font-size: 14px; color: #6366f1; }
+    .tab.on { background: #4f46e5; color: #fff; }
+
+    .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px,1fr)); gap: 8px; margin-top: 12px; }
+    .slot { border: 1.5px solid #d1d5db; border-radius: 10px; padding: 10px 6px; text-align: center; cursor: pointer; user-select: none; background: #fff; transition: .12s; }
+    .slot .t { font-size: 15px; font-weight: 700; }
+    .slot .s { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+    .slot.free:hover { border-color: #6366f1; }
+    .slot.picked { border-color: #6366f1; background: #eef2ff; }
+    .slot.picked .s { color: #6366f1; }
+    .slot.taken { background: #fef2f2; border-color: #fecaca; cursor: not-allowed; }
+    .slot.taken .t { color: #b91c1c; }
+    .slot.taken .s { color: #ef4444; }
+
+    .wdays { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .wd { display: none; }
+    .wd + label { display: inline-block; padding: 8px 14px; border: 1.5px solid #d1d5db; border-radius: 999px; cursor: pointer; font-weight: 700; color: #374151; }
+    .wd:checked + label { background: #eef2ff; border-color: #6366f1; color: #4f46e5; }
+
+    .btn { background: #4f46e5; color: #fff; border: 0; border-radius: 10px; padding: 13px 18px; font-size: 16px; font-weight: 700; cursor: pointer; width: 100%; }
+    .btn:disabled { background: #c7cbe0; cursor: not-allowed; }
+    .btn.ghost { background: #fff; color: #4f46e5; border: 1.5px solid #c7d2fe; margin-top: 10px; }
+
+    .msg { text-align: center; font-size: 14px; padding: 8px; min-height: 20px; }
+    .msg.ok { color: #059669; white-space: pre-line; } .msg.err { color: #dc2626; white-space: pre-line; }
+    .hint { font-size: 12px; color: #9ca3af; margin-top: 8px; }
+    .preview { font-size: 13px; color: #374151; margin-top: 10px; background: #f8fafc; border-radius: 10px; padding: 10px; min-height: 10px; }
+    .loading { text-align:center; color:#9ca3af; padding: 20px; }
+    .mylist { font-size: 13px; }
+    .mylist .item { display:flex; justify-content:space-between; align-items:center; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+    .mylist .item:last-child { border-bottom: 0; }
+    .cancel { color:#dc2626; background:none; border:0; font-size:13px; cursor:pointer; text-decoration:underline; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>🔧 진동시험기 예약</h1>
+      <p>날짜와 시간을 선택해 예약하세요 (1시간 단위)</p>
+    </header>
+
+    <div class="card">
+      <div class="tabs">
+        <div class="tab on" id="tabNormal" onclick="setMode('normal')">일반 예약</div>
+        <div class="tab" id="tabRec" onclick="setMode('rec')">반복 예약</div>
+      </div>
+      <div style="margin-top:12px">
+        <label>장비</label>
+        <select id="machine"></select>
+      </div>
+    </div>
+
+    <!-- 일반 예약 -->
+    <div class="card" id="normalPanel">
+      <label>날짜</label>
+      <input type="date" id="date">
+      <div id="slotArea"><div class="loading">불러오는 중…</div></div>
+      <div class="hint">🟦 선택됨 · 🟥 예약됨(클릭 불가) · <b>연속된 시간만, 최대 8시간</b>까지 선택할 수 있습니다.</div>
+    </div>
+
+    <!-- 반복 예약 -->
+    <div class="card" id="recPanel" style="display:none">
+      <div class="row">
+        <div class="field"><label>시작 날짜</label><input type="date" id="recFrom"></div>
+        <div class="field"><label>종료 날짜</label><input type="date" id="recTo"></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <div class="field"><label>시작 시각</label><select id="recStart"></select></div>
+        <div class="field"><label>길이(시간)</label><select id="recLen"></select></div>
+      </div>
+      <div style="margin-top:12px">
+        <label>요일 필터 (선택 안 하면 기간 내 매일)</label>
+        <div class="wdays" id="wdays"></div>
+      </div>
+      <button class="btn ghost" onclick="previewRecurring()">미리보기</button>
+      <div class="preview" id="recPreview">기간(과 요일)을 고른 뒤 미리보기를 눌러보세요.</div>
+    </div>
+
+    <!-- 예약자 정보 + 예약 버튼 (공통) -->
+    <div class="card">
+      <div class="row">
+        <div class="field"><label>예약자 이름 *</label><input type="text" id="name" placeholder="예: 홍길동"></div>
+        <div class="field"><label>부서 / 연락처</label><input type="text" id="dept" placeholder="예: 품질팀 / 내선 1234"></div>
+      </div>
+      <div style="margin-top:10px"><label>이메일 (선택 · 입력 시 확인 메일 발송)</label><input type="text" id="email" placeholder="예: hong@cantops.biz"></div>
+      <div style="margin-top:10px"><label>메모 (선택)</label><input type="text" id="memo" placeholder="예: 24시간 연속 시험"></div>
+      <div class="msg" id="msg"></div>
+      <button class="btn" id="submitBtn" onclick="submit()">선택한 시간 예약하기</button>
+    </div>
+
+    <!-- 현황 목록 (일반 예약일 때만) -->
+    <div class="card" id="listCard">
+      <label>이 날짜의 예약 현황</label>
+      <div class="mylist" id="list"></div>
+    </div>
+  </div>
+
+  <script>
+    var config = null, pickedHours = [], current = {}, mode = 'normal';
+    var recDates = [], recHours = [], slotEls = {};
+    var WD = ['일', '월', '화', '수', '목', '금', '토'];
+
+    google.script.run.withSuccessHandler(onConfig)
+      .withFailureHandler(function (err) {
+        document.getElementById('slotArea').innerHTML = '<div class="msg err">설정을 불러오지 못했습니다: ' + err.message + '</div>';
+      }).getConfig();
+
+    function onConfig(s) {
+      config = s;
+      var machine = document.getElementById('machine');
+      s.machines.forEach(function (m) { var o = document.createElement('option'); o.value = m; o.textContent = m; machine.appendChild(o); });
+
+      var t = new Date();
+      var todayStr = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+      var d = document.getElementById('date');
+      d.value = todayStr; d.min = todayStr;
+      var fromEl = document.getElementById('recFrom'), toEl = document.getElementById('recTo');
+      fromEl.value = todayStr; fromEl.min = todayStr;
+      toEl.value = todayStr; toEl.min = todayStr;
+
+      // 시작 시각 / 길이 옵션
+      var start = document.getElementById('recStart');
+      for (var h = s.startHour; h < s.endHour; h++) {
+        var o = document.createElement('option'); o.value = h; o.textContent = String(h).padStart(2, '0') + ':00'; start.appendChild(o);
+      }
+      var len = document.getElementById('recLen');
+      var maxLen = Math.min(s.endHour - s.startHour, s.maxHours);
+      for (var L = 1; L <= maxLen; L++) {
+        var o2 = document.createElement('option'); o2.value = L; o2.textContent = L + '시간'; len.appendChild(o2);
+      }
+
+      // 요일 체크박스
+      var wdays = document.getElementById('wdays');
+      for (var i = 0; i < 7; i++) {
+        var id = 'wd' + i;
+        var cb = document.createElement('input'); cb.type = 'checkbox'; cb.className = 'wd'; cb.id = id; cb.value = i;
+        var lb = document.createElement('label'); lb.setAttribute('for', id); lb.textContent = WD[i];
+        wdays.appendChild(cb); wdays.appendChild(lb);
+      }
+
+      machine.onchange = function () { if (mode === 'normal') loadReservations(); };
+      d.onchange = loadReservations;
+      loadReservations();
+    }
+
+    function setMode(m) {
+      mode = m;
+      document.getElementById('tabNormal').classList.toggle('on', m === 'normal');
+      document.getElementById('tabRec').classList.toggle('on', m === 'rec');
+      document.getElementById('normalPanel').style.display = m === 'normal' ? '' : 'none';
+      document.getElementById('recPanel').style.display = m === 'rec' ? '' : 'none';
+      document.getElementById('listCard').style.display = m === 'normal' ? '' : 'none';
+      document.getElementById('submitBtn').textContent = m === 'normal' ? '선택한 시간 예약하기' : '반복 예약하기';
+      document.getElementById('msg').textContent = '';
+      if (m === 'normal') loadReservations();
+    }
+
+    function submit() { if (mode === 'normal') reserve(); else reserveRecurring(); }
+
+    // ---------- 일반 예약 ----------
+    function loadReservations() {
+      pickedHours = [];
+      document.getElementById('slotArea').innerHTML = '<div class="loading">불러오는 중…</div>';
+      google.script.run.withSuccessHandler(function (res) { current = res; drawSlots(); drawList(); })
+        .withFailureHandler(function (err) {
+          document.getElementById('slotArea').innerHTML = '<div class="msg err">현황을 불러오지 못했습니다: ' + err.message + '</div>';
+        }).getReservations(document.getElementById('machine').value, document.getElementById('date').value);
+    }
+
+    function drawSlots() {
+      var area = document.getElementById('slotArea'), g = document.createElement('div');
+      g.className = 'slots';
+      slotEls = {};
+      for (var h = config.startHour; h < config.endHour; h++) {
+        var div = document.createElement('div'), r = current[String(h)];
+        var label = String(h).padStart(2, '0') + ':00';
+        if (r) {
+          div.className = 'slot taken';
+          div.innerHTML = '<div class="t">' + label + '</div><div class="s">' + (r.name || '예약됨') + '</div>';
+        } else {
+          div.className = 'slot free';
+          div.innerHTML = '<div class="t">' + label + '</div><div class="s">가능</div>';
+          slotEls[h] = div;
+          (function (hour) { div.onclick = function () { toggleSlot(hour); }; })(h);
+        }
+        g.appendChild(div);
+      }
+      area.innerHTML = ''; area.appendChild(g);
+    }
+
+    // 연속된 시간만, 최대 config.maxHours 시간까지 선택되게 합니다.
+    function toggleSlot(h) {
+      var msg = document.getElementById('msg'); msg.textContent = '';
+      var idx = pickedHours.indexOf(h);
+      if (idx >= 0) {
+        var mn = Math.min.apply(null, pickedHours), mx = Math.max.apply(null, pickedHours);
+        if (h === mn || h === mx) { pickedHours.splice(idx, 1); } // 양 끝만 해제 가능
+        else { pickedHours = []; }                                // 가운데를 누르면 선택 초기화
+      } else if (pickedHours.length === 0) {
+        pickedHours = [h];
+      } else {
+        var lo = Math.min.apply(null, pickedHours), hi = Math.max.apply(null, pickedHours);
+        if (h === lo - 1 || h === hi + 1) {                       // 블록에 이어붙는 경우만 연장
+          if (pickedHours.length >= config.maxHours) {
+            msg.className = 'msg err'; msg.textContent = '최대 ' + config.maxHours + '시간까지 예약할 수 있습니다.';
+            return;
+          }
+          pickedHours.push(h);
+        } else {
+          pickedHours = [h];                                      // 떨어진 칸을 누르면 새 블록 시작
+        }
+      }
+      applyPicked();
+    }
+
+    function applyPicked() {
+      for (var hh in slotEls) {
+        slotEls[hh].classList.toggle('picked', pickedHours.indexOf(Number(hh)) >= 0);
+      }
+    }
+
+    function drawList() {
+      var list = document.getElementById('list');
+      var hours = Object.keys(current).map(Number).sort(function (a, b) { return a - b; });
+      if (hours.length === 0) { list.innerHTML = '<div style="color:#9ca3af;padding:6px 0">아직 예약이 없습니다.</div>'; return; }
+      list.innerHTML = '';
+      hours.forEach(function (h) {
+        var r = current[String(h)], item = document.createElement('div');
+        item.className = 'item';
+        var left = document.createElement('div');
+        left.innerHTML = '<b>' + String(h).padStart(2, '0') + ':00</b> · ' + r.name +
+          (r.dept ? ' <span style="color:#9ca3af">(' + r.dept + ')</span>' : '') +
+          (r.memo ? '<br><span style="color:#9ca3af;font-size:12px">' + r.memo + '</span>' : '');
+        var cancel = document.createElement('button');
+        cancel.className = 'cancel'; cancel.textContent = '취소';
+        (function (id) { cancel.onclick = function () { cancelBooking(id); }; })(r.id);
+        item.appendChild(left); item.appendChild(cancel); list.appendChild(item);
+      });
+    }
+
+    function reserve() {
+      var msg = document.getElementById('msg'), name = document.getElementById('name').value.trim();
+      if (!name) { msg.className = 'msg err'; msg.textContent = '예약자 이름을 입력해 주세요.'; return; }
+      if (pickedHours.length === 0) { msg.className = 'msg err'; msg.textContent = '시간대를 선택해 주세요.'; return; }
+      var btn = document.getElementById('submitBtn');
+      btn.disabled = true; msg.className = 'msg'; msg.textContent = '예약 처리 중…';
+      google.script.run.withSuccessHandler(function (res) {
+        btn.disabled = false; msg.className = 'msg ' + (res.ok ? 'ok' : 'err'); msg.textContent = res.message;
+        if (res.ok) { document.getElementById('memo').value = ''; loadReservations(); }
+      }).withFailureHandler(function (err) {
+        btn.disabled = false; msg.className = 'msg err'; msg.textContent = '오류: ' + err.message;
+      }).addReservation({
+        machine: document.getElementById('machine').value, date: document.getElementById('date').value,
+        hours: pickedHours, name: name,
+        dept: document.getElementById('dept').value, memo: document.getElementById('memo').value,
+        email: document.getElementById('email').value,
+      });
+    }
+
+    function cancelBooking(id) {
+      var input = prompt('예약을 취소하려면 예약자 이름을 입력하세요.');
+      if (input === null) return;
+      google.script.run.withSuccessHandler(function (res) {
+        var msg = document.getElementById('msg');
+        msg.className = 'msg ' + (res.ok ? 'ok' : 'err'); msg.textContent = res.message;
+        if (res.ok) loadReservations();
+      }).withFailureHandler(function (err) {
+        var msg = document.getElementById('msg'); msg.className = 'msg err'; msg.textContent = '오류: ' + err.message;
+      }).cancelReservation(id, input);
+    }
+
+    // ---------- 반복 예약 ----------
+    function computeRecurring() {
+      var from = document.getElementById('recFrom').value;
+      var to = document.getElementById('recTo').value;
+      if (!from || !to) return { dates: [], hours: [], error: '시작/종료 날짜를 선택해 주세요.' };
+      if (from > to) return { dates: [], hours: [], error: '종료 날짜가 시작 날짜보다 빠릅니다.' };
+
+      var weekdays = [];
+      for (var i = 0; i < 7; i++) { if (document.getElementById('wd' + i).checked) weekdays.push(i); }
+
+      var start = +document.getElementById('recStart').value;
+      var len = +document.getElementById('recLen').value;
+      if (start + len > config.endHour) return { dates: [], hours: [], error: '길이가 운영시간을 넘습니다. (' + String(config.endHour).padStart(2,'0') + ':00 까지)' };
+      var hours = [];
+      for (var h = start; h < start + len; h++) hours.push(h);
+
+      // 기간(시작~종료)을 하루씩 순회. 요일 필터가 비어 있으면 매일 포함.
+      var fp = from.split('-'), tp = to.split('-');
+      var cur = new Date(+fp[0], +fp[1] - 1, +fp[2]);
+      var end = new Date(+tp[0], +tp[1] - 1, +tp[2]);
+      var dates = [], guard = 0;
+      while (cur.getTime() <= end.getTime() && guard < 400) {
+        guard++;
+        if (weekdays.length === 0 || weekdays.indexOf(cur.getDay()) >= 0) {
+          dates.push(cur.getFullYear() + '-' + String(cur.getMonth() + 1).padStart(2, '0') + '-' + String(cur.getDate()).padStart(2, '0'));
+        }
+        cur.setDate(cur.getDate() + 1);
+      }
+      if (dates.length > 92) return { dates: [], hours: [], error: '기간이 너무 깁니다. 약 3개월(92일) 이내로 선택해 주세요.' };
+      if (dates.length === 0) return { dates: [], hours: [], error: '해당 조건의 날짜가 없습니다.' };
+      return { dates: dates, hours: hours, start: start, len: len };
+    }
+
+    function previewRecurring() {
+      var msg = document.getElementById('msg'); msg.textContent = '';
+      var r = computeRecurring();
+      var box = document.getElementById('recPreview');
+      if (r.error) { box.innerHTML = '<span style="color:#dc2626">' + r.error + '</span>'; recDates = []; return; }
+      recDates = r.dates; recHours = r.hours;
+      var timeStr = String(r.start).padStart(2, '0') + ':00 ~ ' + String(r.start + r.len).padStart(2, '0') + ':00';
+      var days = r.dates.map(function (d) {
+        var p = d.split('-'); return p[1] + '/' + p[2];
+      }).join(', ');
+      box.innerHTML = '<b>' + r.dates.length + '일</b> · 각 <b>' + timeStr + '</b><br>' + days;
+    }
+
+    function reserveRecurring() {
+      var msg = document.getElementById('msg'), name = document.getElementById('name').value.trim();
+      var r = computeRecurring();
+      if (r.error) { msg.className = 'msg err'; msg.textContent = r.error; return; }
+      if (!name) { msg.className = 'msg err'; msg.textContent = '예약자 이름을 입력해 주세요.'; return; }
+      if (r.dates.length === 0) { msg.className = 'msg err'; msg.textContent = '해당 조건의 날짜가 없습니다.'; return; }
+      if (!confirm(r.dates.length + '일을 예약합니다. 진행할까요?')) return;
+
+      var btn = document.getElementById('submitBtn');
+      btn.disabled = true; msg.className = 'msg'; msg.textContent = '예약 처리 중…';
+      google.script.run.withSuccessHandler(function (res) {
+        btn.disabled = false; msg.className = 'msg ' + (res.ok ? 'ok' : 'err'); msg.textContent = res.message;
+      }).withFailureHandler(function (err) {
+        btn.disabled = false; msg.className = 'msg err'; msg.textContent = '오류: ' + err.message;
+      }).addRecurring({
+        machine: document.getElementById('machine').value,
+        dates: r.dates, hours: r.hours, name: name,
+        dept: document.getElementById('dept').value, memo: document.getElementById('memo').value,
+        email: document.getElementById('email').value,
+      });
+    }
+  </script>
+</body>
+</html>

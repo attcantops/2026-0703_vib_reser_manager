@@ -1,0 +1,59 @@
+[
+  {
+    "name": "reservations",
+    "type": "base",
+    "system": false,
+    "schema": [
+      {
+        "name": "machine",
+        "type": "text",
+        "required": true,
+        "options": { "min": 1, "max": 100 }
+      },
+      {
+        "name": "date",
+        "type": "text",
+        "required": true,
+        "options": { "min": 10, "max": 10, "pattern": "^\\d{4}-\\d{2}-\\d{2}$" }
+      },
+      {
+        "name": "hour",
+        "type": "number",
+        "required": true,
+        "options": { "min": 0, "max": 23, "noDecimal": true }
+      },
+      {
+        "name": "name",
+        "type": "text",
+        "required": true,
+        "options": { "min": 1, "max": 50 }
+      },
+      {
+        "name": "dept",
+        "type": "text",
+        "required": false,
+        "options": { "max": 50 }
+      },
+      {
+        "name": "memo",
+        "type": "text",
+        "required": false,
+        "options": { "max": 500 }
+      },
+      {
+        "name": "email",
+        "type": "email",
+        "required": false,
+        "options": {}
+      }
+    ],
+    "indexes": [
+      "CREATE UNIQUE INDEX `idx_unique_machine_date_hour` ON `reservations` (`machine`, `date`, `hour`)"
+    ],
+    "listRule": "",
+    "viewRule": "",
+    "createRule": "",
+    "updateRule": "",
+    "deleteRule": ""
+  }
+]

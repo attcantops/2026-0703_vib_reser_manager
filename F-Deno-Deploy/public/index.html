@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>진동시험기 예약</title>
+  <style>
+    /* 심플·모바일 친화 스타일 */
+    :root { --bd:#d0d5dd; --pri:#2563eb; --ok:#16a34a; --busy:#fde2e2; --busybd:#f2a7a7; --sel:#dbeafe; --selbd:#2563eb; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, "Malgun Gothic", sans-serif; margin: 0; background:#f5f6f8; color:#1f2937; }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
+    h1 { font-size: 20px; margin: 8px 0 16px; }
+    .card { background:#fff; border:1px solid var(--bd); border-radius:12px; padding:16px; margin-bottom:16px; }
+    label { display:block; font-size:13px; color:#4b5563; margin-bottom:4px; }
+    select, input[type=text], input[type=date], input[type=email], textarea {
+      width:100%; padding:10px; border:1px solid var(--bd); border-radius:8px; font-size:15px; background:#fff;
+    }
+    .row { display:flex; gap:12px; flex-wrap:wrap; }
+    .row > div { flex:1; min-width:140px; }
+    .grid { display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; margin-top:8px; }
+    @media (max-width:480px){ .grid{ grid-template-columns: repeat(3,1fr);} }
+    .cell {
+      border:1px solid var(--bd); border-radius:8px; padding:8px 4px; text-align:center; cursor:pointer;
+      background:#fff; user-select:none; min-height:56px; display:flex; flex-direction:column; justify-content:center;
+    }
+    .cell .t { font-weight:600; font-size:14px; }
+    .cell .n { font-size:12px; color:#6b7280; margin-top:2px; }
+    .cell.free:hover { border-color:var(--pri); }
+    .cell.selected { background:var(--sel); border-color:var(--selbd); }
+    .cell.busy { background:var(--busy); border-color:var(--busybd); cursor:pointer; }
+    .cell.busy .n { color:#b91c1c; }
+    button { border:none; border-radius:8px; padding:12px 16px; font-size:15px; font-weight:600; cursor:pointer; }
+    .btn-pri { background:var(--pri); color:#fff; width:100%; }
+    .btn-pri:disabled { opacity:.5; cursor:not-allowed; }
+    textarea { min-height:60px; resize:vertical; }
+    .msg { padding:10px 12px; border-radius:8px; margin-top:12px; font-size:14px; display:none; }
+    .msg.ok { background:#dcfce7; color:#166534; display:block; }
+    .msg.err { background:#fee2e2; color:#991b1b; display:block; }
+    .legend { font-size:12px; color:#6b7280; margin-top:10px; }
+    .legend span{ display:inline-block; margin-right:12px; }
+    .dot{ display:inline-block; width:12px; height:12px; border-radius:3px; vertical-align:middle; margin-right:4px; border:1px solid var(--bd);}
+    .hint { font-size:12px; color:#6b7280; margin-top:6px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🔧 진동시험기 예약</h1>
+
+    <!-- 장비 / 날짜 선택 -->
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>장비</label>
+          <select id="machine"></select>
+        </div>
+        <div>
+          <label>날짜</label>
+          <input type="date" id="date" />
+        </div>
+      </div>
+      <div class="legend">
+        <span><i class="dot" style="background:#fff"></i>예약가능(클릭선택)</span>
+        <span><i class="dot" style="background:var(--sel);border-color:var(--selbd)"></i>선택됨</span>
+        <span><i class="dot" style="background:var(--busy);border-color:var(--busybd)"></i>예약됨(클릭시 취소)</span>
+      </div>
+    </div>
+
+    <!-- 시간 그리드 -->
+    <div class="card">
+      <label>시간 선택 (08시 ~ 19시)</label>
+      <div class="grid" id="grid"></div>
+      <div class="hint" id="selHint">빈 시간을 클릭해 선택하세요. (연속된 시간, 최대 <span id="maxH">8</span>시간)</div>
+    </div>
+
+    <!-- 예약 폼 -->
+    <div class="card">
+      <label>예약자 이름 <span style="color:#dc2626">*</span></label>
+      <input type="text" id="name" placeholder="홍길동" />
+      <div class="row" style="margin-top:10px">
+        <div>
+          <label>부서 (선택)</label>
+          <input type="text" id="dept" placeholder="연구소" />
+        </div>
+        <div>
+          <label>이메일 (선택)</label>
+          <input type="email" id="email" placeholder="name@company.com" />
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        <label>메모 (선택)</label>
+        <textarea id="memo" placeholder="시험 내용 등"></textarea>
+      </div>
+      <div style="margin-top:14px">
+        <button class="btn-pri" id="reserveBtn">예약하기</button>
+      </div>
+      <div class="msg" id="msg"></div>
+    </div>
+  </div>
+
+<script>
+// ===== 프론트엔드: fetch 로 자기 자신의 /api/* 호출 (Cloudflare 버전과 동일 방식) =====
+let CONFIG = null;
+let reservations = [];   // 현재 날짜의 예약 목록
+let selected = new Set(); // 선택한 시간들
+
+const $ = (id) => document.getElementById(id);
+
+async function loadConfig() {
+  const r = await fetch("/api/config").then(r => r.json());
+  CONFIG = r.config;
+  // 장비 셀렉트 채우기 (1개면 고정 표시)
+  const sel = $("machine");
+  sel.innerHTML = "";
+  CONFIG.machines.forEach(m => {
+    const o = document.createElement("option");
+    o.value = m; o.textContent = m; sel.appendChild(o);
+  });
+  if (CONFIG.machines.length === 1) sel.disabled = true;
+  $("maxH").textContent = CONFIG.maxHours;
+}
+
+// 오늘 날짜 YYYY-MM-DD (로컬)
+function todayStr() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+}
+
+async function loadReservations() {
+  selected.clear();
+  const machine = $("machine").value;
+  const date = $("date").value;
+  const r = await fetch(`/api/reservations?machine=${encodeURIComponent(machine)}&date=${date}`).then(r => r.json());
+  reservations = r.ok ? r.reservations : [];
+  renderGrid();
+}
+
+function findRes(hour) {
+  return reservations.find(x => x.hour === hour);
+}
+
+function renderGrid() {
+  const grid = $("grid");
+  grid.innerHTML = "";
+  for (let h = CONFIG.startHour; h < CONFIG.endHour; h++) {
+    const res = findRes(h);
+    const cell = document.createElement("div");
+    const label = String(h).padStart(2, "0") + ":00";
+    if (res) {
+      cell.className = "cell busy";
+      cell.innerHTML = `<div class="t">${label}</div><div class="n">${res.name}</div>`;
+      cell.onclick = () => cancelReservation(res);
+    } else {
+      cell.className = "cell free" + (selected.has(h) ? " selected" : "");
+      cell.innerHTML = `<div class="t">${label}</div><div class="n">${selected.has(h) ? "선택됨" : "가능"}</div>`;
+      cell.onclick = () => toggle(h);
+    }
+    grid.appendChild(cell);
+  }
+}
+
+function toggle(h) {
+  if (selected.has(h)) selected.delete(h); else selected.add(h);
+  renderGrid();
+}
+
+function showMsg(text, ok) {
+  const m = $("msg");
+  m.textContent = text;
+  m.className = "msg " + (ok ? "ok" : "err");
+}
+
+async function reserve() {
+  const name = $("name").value.trim();
+  if (!name) { showMsg("예약자 이름은 필수입니다.", false); return; }
+  const hours = [...selected].sort((a,b)=>a-b);
+  if (hours.length === 0) { showMsg("예약할 시간을 하나 이상 선택하세요.", false); return; }
+
+  const btn = $("reserveBtn"); btn.disabled = true;
+  try {
+    const body = {
+      machine: $("machine").value,
+      date: $("date").value,
+      hours,
+      name,
+      dept: $("dept").value.trim(),
+      memo: $("memo").value.trim(),
+      email: $("email").value.trim(),
+    };
+    const r = await fetch("/api/reservations", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }).then(r => r.json());
+
+    if (r.ok) {
+      showMsg(r.message || "예약이 완료되었습니다.", true);
+      await loadReservations();     // 그리드 새로고침
+    } else {
+      let extra = r.conflicts && r.conflicts.length ? ` (충돌: ${r.conflicts.map(h=>h+"시").join(", ")})` : "";
+      showMsg((r.error || "예약에 실패했습니다.") + extra, false);
+      await loadReservations();
+    }
+  } catch (e) {
+    showMsg("네트워크 오류가 발생했습니다.", false);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function cancelReservation(res) {
+  const who = prompt(`"${res.name}" 님의 ${String(res.hour).padStart(2,"0")}:00 예약을 취소합니다.\n확인을 위해 예약자 이름을 입력하세요.`);
+  if (who === null) return;
+  const r = await fetch("/api/reservations/cancel", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id: res.id, name: who.trim() }),
+  }).then(r => r.json());
+  showMsg(r.ok ? (r.message || "예약이 취소되었습니다.") : (r.error || "취소에 실패했습니다."), r.ok);
+  await loadReservations();
+}
+
+// 이벤트 연결 및 초기화
+$("date").value = todayStr();
+$("machine").addEventListener("change", loadReservations);
+$("date").addEventListener("change", loadReservations);
+$("reserveBtn").addEventListener("click", reserve);
+
+(async function init(){
+  await loadConfig();
+  await loadReservations();
+})();
+</script>
+</body>
+</html>
