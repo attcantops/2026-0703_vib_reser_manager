@@ -94,12 +94,14 @@ fi
 # 이 스크립트는 /opt/vibres/update.sh (저장소 바깥)에서 실행된다.
 # 저장소 쪽에 새 버전이 있으면 가져다 둔다. 실행 중인 파일을 직접 덮으면
 # bash 가 나머지를 잘못 읽을 수 있으므로, 임시파일에 쓴 뒤 mv 로 교체한다.
-if [ -f "$SRC_DIR/update.sh" ] && ! cmp -s "$SRC_DIR/update.sh" "$APP_DIR/update.sh"; then
-  cp "$SRC_DIR/update.sh" "$APP_DIR/update.sh.new"
-  chmod 755 "$APP_DIR/update.sh.new"
-  mv -f "$APP_DIR/update.sh.new" "$APP_DIR/update.sh"
-  echo "  update.sh 자체도 갱신됨 (다음 실행부터 적용)"
-fi
+for S in update.sh backup.sh; do
+  if [ -f "$SRC_DIR/$S" ] && ! cmp -s "$SRC_DIR/$S" "$APP_DIR/$S"; then
+    cp "$SRC_DIR/$S" "$APP_DIR/$S.new"
+    chmod 755 "$APP_DIR/$S.new"
+    mv -f "$APP_DIR/$S.new" "$APP_DIR/$S"
+    echo "  $S 갱신됨"
+  fi
+done
 
 # ── 재시작 ───────────────────────────────────────────────────
 log "서비스 재시작"
