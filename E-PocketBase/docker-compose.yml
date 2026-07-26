@@ -1,0 +1,34 @@
+# 진동시험기 예약 (PocketBase) — 시놀로지 Container Manager / QNAP Container Station 용
+#
+# 사용법 (NAS SSH 접속 후)
+#   git clone https://github.com/attcantops/2026-0703_vib_reser_manager.git
+#   cd 2026-0703_vib_reser_manager/E-PocketBase
+#   docker compose up -d --build
+#
+# 업데이트 (이후에는 이것만)
+#   git pull && docker compose up -d --build
+#
+# 예약 데이터는 ./pb_data 폴더(호스트)에 남으므로 컨테이너를 지워도 보존된다.
+
+services:
+  vibres:
+    build:
+      context: .
+      args:
+        # PocketBase 버전 고정. 올릴 때 이 값만 바꾸고 재빌드하면 된다.
+        PB_VERSION: "0.39.9"
+    image: vibres-pocketbase:latest
+    container_name: vibres
+    restart: unless-stopped
+    ports:
+      # NAS의 다른 서비스와 8090이 겹치면 왼쪽 숫자만 바꾼다 (예: "8091:8090")
+      - "8090:8090"
+    volumes:
+      # 예약 DB. 이 폴더만 백업하면 전체 백업이 된다.
+      - ./pb_data:/app/pb_data
+      # 아래 두 줄의 주석을 풀면 재빌드 없이 git pull 만으로 화면이 갱신된다.
+      # (개발/디버깅 중에 편리. 운영 고정 후에는 다시 주석 처리 권장)
+      # - ./pb_public:/app/pb_public:ro
+      # - ./pb_migrations:/app/pb_migrations:ro
+    environment:
+      TZ: Asia/Seoul

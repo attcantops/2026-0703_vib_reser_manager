@@ -174,7 +174,9 @@
 </div>
 
 <!-- PocketBase JS SDK (UMD, CDN) -->
-<script src="https://cdn.jsdelivr.net/npm/pocketbase@0.21.5/dist/pocketbase.umd.js"></script>
+<!-- SDK는 같은 서버에서 서빙한다. 인터넷이 막힌 사내망/폐쇄망에서도 동작해야 하므로
+     CDN(jsdelivr 등)을 쓰지 않는다. 갱신은 lib/pocketbase.umd.js 파일 교체로 한다. -->
+<script src="lib/pocketbase.umd.js"></script>
 <script>
 /* ============================================================
    설정 (CONFIG)

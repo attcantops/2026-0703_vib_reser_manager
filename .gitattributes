@@ -1,0 +1,6 @@
+# 쉘 스크립트는 반드시 LF 로 유지한다.
+# 윈도우에서 커밋할 때 CRLF 가 섞이면 리눅스/라즈베리파이에서
+# "bad interpreter: /usr/bin/env bash^M" 오류로 실행 자체가 실패한다.
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+*.yml       text eol=lf

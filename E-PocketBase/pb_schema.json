@@ -1,59 +1,153 @@
-[
-  {
-    "name": "reservations",
-    "type": "base",
-    "system": false,
-    "schema": [
-      {
-        "name": "machine",
-        "type": "text",
-        "required": true,
-        "options": { "min": 1, "max": 100 }
-      },
-      {
-        "name": "date",
-        "type": "text",
-        "required": true,
-        "options": { "min": 10, "max": 10, "pattern": "^\\d{4}-\\d{2}-\\d{2}$" }
-      },
-      {
-        "name": "hour",
-        "type": "number",
-        "required": true,
-        "options": { "min": 0, "max": 23, "noDecimal": true }
-      },
-      {
-        "name": "name",
-        "type": "text",
-        "required": true,
-        "options": { "min": 1, "max": 50 }
-      },
-      {
-        "name": "dept",
-        "type": "text",
-        "required": false,
-        "options": { "max": 50 }
-      },
-      {
-        "name": "memo",
-        "type": "text",
-        "required": false,
-        "options": { "max": 500 }
-      },
-      {
-        "name": "email",
-        "type": "email",
-        "required": false,
-        "options": {}
-      }
-    ],
-    "indexes": [
-      "CREATE UNIQUE INDEX `idx_unique_machine_date_hour` ON `reservations` (`machine`, `date`, `hour`)"
-    ],
-    "listRule": "",
-    "viewRule": "",
-    "createRule": "",
-    "updateRule": "",
-    "deleteRule": ""
-  }
-]
+{
+  "id": "pbc_1473635903",
+  "listRule": "",
+  "viewRule": "",
+  "createRule": "",
+  "updateRule": null,
+  "deleteRule": "",
+  "name": "reservations",
+  "type": "base",
+  "fields": [
+    {
+      "autogeneratePattern": "[a-z0-9]{15}",
+      "help": "",
+      "hidden": false,
+      "id": "text3208210256",
+      "max": 15,
+      "min": 15,
+      "name": "id",
+      "pattern": "^[a-z0-9]+$",
+      "presentable": false,
+      "primaryKey": true,
+      "required": true,
+      "system": true,
+      "type": "text"
+    },
+    {
+      "autogeneratePattern": "",
+      "help": "",
+      "hidden": false,
+      "id": "text352706436",
+      "max": 100,
+      "min": 0,
+      "name": "machine",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": true,
+      "system": false,
+      "type": "text"
+    },
+    {
+      "autogeneratePattern": "",
+      "help": "",
+      "hidden": false,
+      "id": "text2862495610",
+      "max": 10,
+      "min": 10,
+      "name": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "presentable": false,
+      "primaryKey": false,
+      "required": true,
+      "system": false,
+      "type": "text"
+    },
+    {
+      "help": "",
+      "hidden": false,
+      "id": "number1881018702",
+      "max": 23,
+      "min": 0,
+      "name": "hour",
+      "onlyInt": true,
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "number"
+    },
+    {
+      "autogeneratePattern": "",
+      "help": "",
+      "hidden": false,
+      "id": "text1579384326",
+      "max": 50,
+      "min": 0,
+      "name": "name",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": true,
+      "system": false,
+      "type": "text"
+    },
+    {
+      "autogeneratePattern": "",
+      "help": "",
+      "hidden": false,
+      "id": "text2739632720",
+      "max": 50,
+      "min": 0,
+      "name": "dept",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": false,
+      "system": false,
+      "type": "text"
+    },
+    {
+      "autogeneratePattern": "",
+      "help": "",
+      "hidden": false,
+      "id": "text2873790506",
+      "max": 500,
+      "min": 0,
+      "name": "memo",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": false,
+      "system": false,
+      "type": "text"
+    },
+    {
+      "exceptDomains": null,
+      "help": "",
+      "hidden": false,
+      "id": "email3885137012",
+      "name": "email",
+      "onlyDomains": null,
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "email"
+    },
+    {
+      "hidden": false,
+      "id": "autodate2990389176",
+      "name": "created",
+      "onCreate": true,
+      "onUpdate": false,
+      "presentable": false,
+      "system": false,
+      "type": "autodate"
+    },
+    {
+      "hidden": false,
+      "id": "autodate3332085495",
+      "name": "updated",
+      "onCreate": true,
+      "onUpdate": true,
+      "presentable": false,
+      "system": false,
+      "type": "autodate"
+    }
+  ],
+  "indexes": [
+    "CREATE UNIQUE INDEX `idx_unique_machine_date_hour` ON `reservations` (`machine`, `date`, `hour`)"
+  ],
+  "created": "2026-07-26 10:08:06.731Z",
+  "updated": "2026-07-26 10:08:06.731Z",
+  "system": false
+}
