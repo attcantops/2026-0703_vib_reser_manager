@@ -7,3 +7,9 @@ dist/
 .next/
 .DS_Store
 Thumbs.db
+
+# 브라우저에서 저장된 메모/자격증명 파일이 실수로 커밋되지 않도록 차단
+http*.txt
+*_login.txt
+*비밀번호*
+*password*.txt
