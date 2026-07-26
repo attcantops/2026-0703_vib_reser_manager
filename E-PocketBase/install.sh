@@ -21,8 +21,17 @@ REPO_URL="https://github.com/attcantops/2026-0703_vib_reser_manager.git"
 SRC_DIR="$APP_DIR/repo/E-PocketBase"
 PORT="${PORT:-8090}"
 SERVICE="vibres"
-# 특정 버전으로 고정하려면 PB_VERSION=0.39.9 형태로 환경변수를 주면 된다.
-PB_VERSION="${PB_VERSION:-}"
+# PocketBase 버전은 "검증된 값"으로 고정한다.
+#
+# 매번 최신을 받아오면, 오늘 설치한 것과 몇 달 뒤 담당자가 설치하는 것이 서로 다른
+# 소프트웨어가 된다. PocketBase 는 아직 1.0 이전이라 실제로 v0.23 에서 컬렉션 API 가
+# 통째로 바뀐 전력이 있고, pb_migrations 도 그 API 에 의존한다. 즉 버전을 고정하지
+# 않으면 지금까지의 검증 결과가 미래의 설치를 보증하지 못한다.
+#
+# 올릴 때는 의도적으로 올린다: 이 값을 바꿔 검증한 뒤 커밋하거나,
+# 임시로는 PB_VERSION=0.40.0 처럼 환경변수로 덮어쓴다.
+# 최신을 받고 싶으면 PB_VERSION=latest 로 준다.
+PB_VERSION="${PB_VERSION:-0.39.9}"   # 라즈베리파이 4(arm64)에서 검증 완료
 
 log() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 die() { printf '\n\033[1;31m[오류] %s\033[0m\n' "$*" >&2; exit 1; }
@@ -63,8 +72,8 @@ esac
 echo "  $(uname -m)  ->  linux_${PB_ARCH}"
 
 # ── 3. PocketBase 실행파일 설치 ──────────────────────────────
-if [ -z "$PB_VERSION" ]; then
-  log "PocketBase 최신 버전 조회"
+if [ -z "$PB_VERSION" ] || [ "$PB_VERSION" = "latest" ]; then
+  log "PocketBase 최신 버전 조회 (검증되지 않은 버전일 수 있음)"
   PB_VERSION="$(curl -fsSL https://api.github.com/repos/pocketbase/pocketbase/releases/latest \
                 | grep -o '"tag_name": *"v[^"]*"' | head -1 | sed 's/.*"v\([^"]*\)".*/\1/')"
   [ -n "$PB_VERSION" ] || die "버전 조회 실패. 인터넷 연결을 확인하거나 PB_VERSION=0.39.9 처럼 직접 지정하세요."
@@ -103,6 +112,26 @@ mkdir -p "$APP_DIR/pb_data"
 # 저장소 안의 것을 직접 실행하면, --rollback 으로 update.sh 가 없던 시점까지
 # 되돌아갔을 때 스크립트가 스스로 사라져 다시 앞으로 갈 수단이 없어진다.
 install -m 755 "$SRC_DIR/update.sh" "$APP_DIR/update.sh"
+install -m 755 "$SRC_DIR/backup.sh" "$APP_DIR/backup.sh"
+
+# 백업 cron 등록. PocketBase 내장 백업(03:00)이 끝난 뒤 03:10 에 장치 바깥으로 내보낸다.
+# 내장 백업만으로는 pb_data 안, 즉 같은 SD카드에만 남아 SD 손상 시 함께 사라진다.
+if ! crontab -l 2>/dev/null | grep -q "vibres/backup.sh"; then
+  ( crontab -l 2>/dev/null; \
+    echo "10 3 * * * $APP_DIR/backup.sh --push >> /var/log/vibres-backup.log 2>&1" \
+  ) | crontab -
+  echo "  백업 cron 등록됨 (매일 03:10)"
+fi
+# 원격 대상 설정 파일 뼈대 (비어 있으면 --push 가 실패하며 경고한다)
+if [ ! -f "$APP_DIR/backup.conf" ]; then
+  cat > "$APP_DIR/backup.conf" <<'CONF'
+# 백업을 내보낼 원격 위치. 여기가 비어 있으면 백업이 이 장치에만 남습니다.
+# 예) REMOTE="user@192.168.0.8:/d/backup/vibres"
+REMOTE=""
+SSH_KEY=""
+CONF
+  chmod 600 "$APP_DIR/backup.conf"
+fi
 
 # ── 5. systemd 서비스 등록 ───────────────────────────────────
 log "부팅 시 자동 실행 등록 (systemd: ${SERVICE})"
