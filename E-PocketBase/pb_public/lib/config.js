@@ -22,6 +22,15 @@ const CONFIG = {
     { group: 'TestBed', name: 'TestBed 1호' },
     { group: 'TestBed', name: 'TestBed 2호' },
   ],
+  // 이메일을 필수로 받는다.
+  //
+  // 취소 통보 때문이다. 지금은 이름·부서만 맞으면 남의 예약도 지울 수 있고,
+  // 지워진 사실을 당사자가 알 방법이 메일뿐이다. 이메일이 선택이면 대부분 안 적고,
+  // 그러면 정작 필요한 사람에게 아무 통보도 못 간다.
+  //
+  // 메일을 안 쓰기로 하면 false 로 바꾼다. 나머지 동작은 그대로다.
+  requireEmail: true,
+
   startHour: 8,     // 예약 가능 시작
   endHour: 20,      // 예약 가능 시각은 8..19 (endHour 미만)
   maxHours: 8,      // 연속 최대

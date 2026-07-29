@@ -177,7 +177,8 @@ ExecStart=${APP_DIR}/pocketbase serve \\
   --http=0.0.0.0:${PORT} \\
   --dir=${APP_DIR}/pb_data \\
   --publicDir=${SRC_DIR}/pb_public \\
-  --migrationsDir=${SRC_DIR}/pb_migrations
+  --migrationsDir=${SRC_DIR}/pb_migrations \\
+  --hooksDir=${SRC_DIR}/pb_hooks
 Restart=always
 RestartSec=5
 

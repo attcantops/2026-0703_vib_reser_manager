@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>설치방법</title>
+<style>
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body {
+  font-family: "Segoe UI", "Malgun Gothic", "맑은 고딕", -apple-system, sans-serif;
+  line-height: 1.7; max-width: 900px; margin: 0 auto; padding: 40px 24px;
+  color: #24292f; background: #ffffff; word-break: keep-all; overflow-wrap: anywhere;
+}
+h1,h2,h3,h4 { font-weight: 600; line-height: 1.3; margin-top: 1.6em; margin-bottom: .6em; }
+h1 { font-size: 2em; border-bottom: 1px solid #d8dee4; padding-bottom: .3em; }
+h2 { font-size: 1.5em; border-bottom: 1px solid #d8dee4; padding-bottom: .3em; }
+h3 { font-size: 1.25em; }
+a { color: #0969da; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font-family: "Cascadia Code", Consolas, "D2Coding", monospace;
+  background: rgba(175,184,193,.2); padding: .2em .4em; border-radius: 6px; font-size: .9em; }
+pre { background: #f6f8fa; padding: 16px; border-radius: 8px; overflow: auto; }
+pre code { background: none; padding: 0; font-size: .88em; }
+blockquote { margin: 0; padding: 0 1em; color: #57606a; border-left: .25em solid #d0d7de; }
+table { border-collapse: collapse; width: 100%; margin: 1em 0; display: block; overflow: auto; }
+th, td { border: 1px solid #d0d7de; padding: 6px 13px; }
+th { background: #f6f8fa; font-weight: 600; }
+tr:nth-child(2n) { background: #f6f8fa; }
+img { max-width: 100%; }
+hr { height: 1px; background: #d8dee4; border: 0; margin: 24px 0; }
+ul.task-list { list-style: none; padding-left: 1em; }
+li.task-list-item input { margin-right: .5em; }
+@media (prefers-color-scheme: dark) {
+  body { color: #c9d1d9; background: #0d1117; }
+  h1,h2 { border-color: #21262d; }
+  a { color: #58a6ff; }
+  code { background: rgba(110,118,129,.4); }
+  pre { background: #161b22; }
+  th,td { border-color: #30363d; }
+  th, tr:nth-child(2n) { background: #161b22; }
+  blockquote { color: #8b949e; border-color: #30363d; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.codehilite .hll { background-color: #ffffcc }
+.codehilite { background: #f8f8f8; }
+.codehilite .c { color: #3D7B7B; font-style: italic } /* Comment */
+.codehilite .err { border: 1px solid #F00 } /* Error */
+.codehilite .k { color: #008000; font-weight: bold } /* Keyword */
+.codehilite .o { color: #666 } /* Operator */
+.codehilite .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.codehilite .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.codehilite .cp { color: #9C6500 } /* Comment.Preproc */
+.codehilite .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.codehilite .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.codehilite .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.codehilite .gd { color: #A00000 } /* Generic.Deleted */
+.codehilite .ge { font-style: italic } /* Generic.Emph */
+.codehilite .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.codehilite .gr { color: #E40000 } /* Generic.Error */
+.codehilite .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.codehilite .gi { color: #008400 } /* Generic.Inserted */
+.codehilite .go { color: #717171 } /* Generic.Output */
+.codehilite .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.codehilite .gs { font-weight: bold } /* Generic.Strong */
+.codehilite .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.codehilite .gt { color: #04D } /* Generic.Traceback */
+.codehilite .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.codehilite .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.codehilite .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.codehilite .kp { color: #008000 } /* Keyword.Pseudo */
+.codehilite .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.codehilite .kt { color: #B00040 } /* Keyword.Type */
+.codehilite .m { color: #666 } /* Literal.Number */
+.codehilite .s { color: #BA2121 } /* Literal.String */
+.codehilite .na { color: #687822 } /* Name.Attribute */
+.codehilite .nb { color: #008000 } /* Name.Builtin */
+.codehilite .nc { color: #00F; font-weight: bold } /* Name.Class */
+.codehilite .no { color: #800 } /* Name.Constant */
+.codehilite .nd { color: #A2F } /* Name.Decorator */
+.codehilite .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.codehilite .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.codehilite .nf { color: #00F } /* Name.Function */
+.codehilite .nl { color: #767600 } /* Name.Label */
+.codehilite .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.codehilite .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.codehilite .nv { color: #19177C } /* Name.Variable */
+.codehilite .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.codehilite .w { color: #BBB } /* Text.Whitespace */
+.codehilite .mb { color: #666 } /* Literal.Number.Bin */
+.codehilite .mf { color: #666 } /* Literal.Number.Float */
+.codehilite .mh { color: #666 } /* Literal.Number.Hex */
+.codehilite .mi { color: #666 } /* Literal.Number.Integer */
+.codehilite .mo { color: #666 } /* Literal.Number.Oct */
+.codehilite .sa { color: #BA2121 } /* Literal.String.Affix */
+.codehilite .sb { color: #BA2121 } /* Literal.String.Backtick */
+.codehilite .sc { color: #BA2121 } /* Literal.String.Char */
+.codehilite .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.codehilite .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.codehilite .s2 { color: #BA2121 } /* Literal.String.Double */
+.codehilite .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.codehilite .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.codehilite .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.codehilite .sx { color: #008000 } /* Literal.String.Other */
+.codehilite .sr { color: #A45A77 } /* Literal.String.Regex */
+.codehilite .s1 { color: #BA2121 } /* Literal.String.Single */
+.codehilite .ss { color: #19177C } /* Literal.String.Symbol */
+.codehilite .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.codehilite .fm { color: #00F } /* Name.Function.Magic */
+.codehilite .vc { color: #19177C } /* Name.Variable.Class */
+.codehilite .vg { color: #19177C } /* Name.Variable.Global */
+.codehilite .vi { color: #19177C } /* Name.Variable.Instance */
+.codehilite .vm { color: #19177C } /* Name.Variable.Magic */
+.codehilite .il { color: #666 } /* Literal.Number.Integer.Long */</style>
+</head>
+<body>
+<h1 id="pocketbase">진동시험기 예약 — PocketBase 버전 설치방법</h1>
+<h2 id="0-pocketbase-1">0. PocketBase가 뭔가요? (1문단)</h2>
+<p>PocketBase는 <strong>Go로 만든 단일 실행파일 백엔드</strong>입니다. 파일 하나만 실행하면 그 안에<br />
+<strong>SQLite 데이터베이스 + 자동 REST API + 웹 관리자 UI + 로그인/파일저장</strong>이 전부 들어 있습니다.<br />
+서버 프로그램을 따로 설치하거나 DB를 세팅할 필요가 없고, <code>pocketbase serve</code> 명령 하나로 백엔드가 뜹니다.<br />
+정적 웹페이지(HTML/JS)는 <code>pb_public/</code> 폴더에 두면 <strong>같은 서버가 함께 서빙</strong>해 줍니다.</p>
+<p><strong>가입은 없습니다.</strong> 실행파일만 받으면 끝이고, 계정·서버·요금제가 없습니다.<br />
+만드는 "관리자 계정"도 그 서버 안 SQLite 파일에만 저장되는 로컬 계정이라, 외부로 나가는 정보가 없습니다.<br />
+사내망 폐쇄 환경에 적합합니다. (Supabase·Vercel·Cloudflare 방식은 모두 외부 계정이 필요합니다)</p>
+<hr />
+<h2 id="1">1. 이 폴더의 구성</h2>
+<div class="codehilite"><pre><span></span><code>E-PocketBase/
+  pb_public/                     예약 화면 (정적 웹)
+    index.html
+    lib/pocketbase.umd.js        JS SDK — 인터넷 없이 동작하도록 내장(CDN 미사용)
+  pb_migrations/
+    1700000000_init_reservations.js   reservations 컬렉션 자동 생성
+  install.sh                     [담당자] 최초 1회 설치 (라즈베리파이/리눅스/NAS)
+  update.sh                      [운영자] 이후 업데이트 — SSH 접속해서 실행
+  Dockerfile / docker-compose.yml   시놀로지·QNAP 등 Docker 전용 NAS용
+  pb_schema.json                 참고용 스키마 덤프 (설치에는 불필요)
+</code></pre></div>
+
+<blockquote>
+<p><strong>컬렉션을 손으로 만들 필요가 없습니다.</strong> <code>pb_migrations/</code> 안의 파일이 첫 실행 때<br />
+<code>reservations</code> 컬렉션 + 중복방지 인덱스 + API 권한까지 자동으로 만듭니다.<br />
+<code>pb_schema.json</code>은 실제로 생성된 결과를 덤프해 둔 <strong>참고 자료</strong>이며, 임포트할 필요가 없습니다.</p>
+</blockquote>
+<hr />
+<h2 id="2">2. 운영 시나리오</h2>
+<table>
+<thead>
+<tr>
+<th>단계</th>
+<th>누가</th>
+<th>무엇을</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>최초 1회</td>
+<td>담당자</td>
+<td><code>install.sh</code> 실행 (아래 3장)</td>
+</tr>
+<tr>
+<td>이후 계속</td>
+<td>운영자</td>
+<td>SSH 접속 → <code>update.sh</code> 실행 (아래 5장)</td>
+</tr>
+</tbody>
+</table>
+<p>예약 데이터는 <code>/opt/vibres/pb_data</code> 에 저장되며 <strong>저장소 바깥</strong>입니다.<br />
+소스를 몇 번을 업데이트해도 예약 데이터는 지워지지 않습니다.</p>
+<hr />
+<h2 id="3">3. 최초 설치 — 담당자에게 요청할 내용</h2>
+<p>라즈베리파이 / 리눅스 서버 / SSH 되는 NAS에서 <strong>아래 한 줄만</strong> 실행하면 됩니다.</p>
+<div class="codehilite"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/attcantops/2026-0703_vib_reser_manager/main/E-PocketBase/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash
+</code></pre></div>
+
+<p>스크립트가 자동으로 처리하는 것:</p>
+<ol>
+<li>CPU 아키텍처 판별 (arm64 / armv7 / amd64) 후 PocketBase 최신판 설치</li>
+<li>저장소를 <code>/opt/vibres/repo</code> 로 clone</li>
+<li><strong>systemd 서비스 등록</strong> — 재부팅해도 자동 실행</li>
+<li>기동 확인 후 접속 주소 출력</li>
+</ol>
+<p>끝나면 이런 주소가 표시됩니다.</p>
+<ul>
+<li>예약 화면: <code>http://&lt;서버IP&gt;:8090/</code></li>
+<li>관리자 화면: <code>http://&lt;서버IP&gt;:8090/_/</code></li>
+</ul>
+<h3 id="1_1">설치 직후 1회만 할 일 — 관리자 계정 만들기</h3>
+<p>브라우저로 <code>http://&lt;서버IP&gt;:8090/_/</code> 에 접속하면 이메일/비밀번호를 만들라고 나옵니다.<br />
+터미널에서 바로 만들려면:</p>
+<div class="codehilite"><pre><span></span><code>sudo<span class="w"> </span>/opt/vibres/pocketbase<span class="w"> </span>--dir<span class="o">=</span>/opt/vibres/pb_data<span class="w"> </span>superuser<span class="w"> </span>upsert<span class="w"> </span>&lt;이메일&gt;<span class="w"> </span>&lt;비밀번호&gt;
+</code></pre></div>
+
+<p>(<code>upsert</code> 는 없으면 생성, 있으면 비밀번호 변경 — 비밀번호를 잊었을 때도 이 명령으로 재설정합니다)</p>
+<h3 id="_1">포트를 바꾸고 싶다면</h3>
+<div class="codehilite"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>&lt;위<span class="w"> </span>URL&gt;<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span><span class="nv">PORT</span><span class="o">=</span><span class="m">8095</span><span class="w"> </span>bash
+</code></pre></div>
+
+<hr />
+<h2 id="4-qnap-docker-nas">4. 시놀로지 / QNAP (Docker 전용 NAS)</h2>
+<p>SSH가 안 되거나 Docker로만 올려야 하는 NAS는 이쪽을 씁니다.</p>
+<div class="codehilite"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/attcantops/2026-0703_vib_reser_manager.git
+<span class="nb">cd</span><span class="w"> </span><span class="m">2026</span>-0703_vib_reser_manager/E-PocketBase
+docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--build
+</code></pre></div>
+
+<ul>
+<li>시놀로지: <strong>Container Manager → 프로젝트 → 생성</strong> 에서 이 폴더를 지정해도 됩니다.</li>
+<li>8090 포트가 이미 쓰이고 있으면 <code>docker-compose.yml</code> 의 <code>"8090:8090"</code> 에서 <strong>왼쪽 숫자만</strong> 바꾸세요.</li>
+<li>예약 데이터는 호스트의 <code>./pb_data</code> 폴더에 남습니다. <strong>이 폴더만 백업하면 전체 백업</strong>입니다.</li>
+</ul>
+<p>업데이트:</p>
+<div class="codehilite"><pre><span></span><code>git<span class="w"> </span>pull<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--build
+</code></pre></div>
+
+<hr />
+<h2 id="5">5. 업데이트 / 디버깅 (설치 이후)</h2>
+<p>담당자를 다시 부를 필요 없이, SSH로 접속해서 실행합니다.</p>
+<div class="codehilite"><pre><span></span><code>ssh<span class="w"> </span>&lt;계정&gt;@&lt;서버IP&gt;
+sudo<span class="w"> </span>/opt/vibres/repo/E-PocketBase/update.sh
+</code></pre></div>
+
+<p>하는 일: 최신 소스 <code>git pull</code> → 서비스 재시작 → 정상 기동 확인.<br />
+기동에 실패하면 로그를 자동으로 보여주고, 되돌릴 방법을 안내합니다.</p>
+<table>
+<thead>
+<tr>
+<th>명령</th>
+<th>용도</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sudo .../update.sh</code></td>
+<td>소스만 최신으로 (평상시 이것만)</td>
+</tr>
+<tr>
+<td><code>sudo .../update.sh --pb</code></td>
+<td>PocketBase 실행파일도 최신 버전으로 (DB 자동 백업 후 진행)</td>
+</tr>
+<tr>
+<td><code>sudo .../update.sh --rollback</code></td>
+<td>직전 커밋으로 되돌리고 재시작</td>
+</tr>
+<tr>
+<td><code>sudo systemctl status vibres</code></td>
+<td>현재 상태</td>
+</tr>
+<tr>
+<td><code>sudo journalctl -u vibres -f</code></td>
+<td>실시간 로그</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>화면(HTML/CSS/JS)만 고치는 작업은 이 저장소에서 커밋·푸시한 뒤 <code>update.sh</code> 한 번이면 반영됩니다.</p>
+</blockquote>
+<hr />
+<h2 id="6">6. 데이터 백업 / 복구</h2>
+<div class="codehilite"><pre><span></span><code><span class="c1"># 백업 — 이 폴더 하나가 전부입니다</span>
+sudo<span class="w"> </span>tar<span class="w"> </span>czf<span class="w"> </span>~/vibres-backup-<span class="k">$(</span>date<span class="w"> </span>+%Y%m%d<span class="k">)</span>.tar.gz<span class="w"> </span>-C<span class="w"> </span>/opt/vibres<span class="w"> </span>pb_data
+
+<span class="c1"># 복구</span>
+sudo<span class="w"> </span>systemctl<span class="w"> </span>stop<span class="w"> </span>vibres
+sudo<span class="w"> </span>tar<span class="w"> </span>xzf<span class="w"> </span>~/vibres-backup-YYYYMMDD.tar.gz<span class="w"> </span>-C<span class="w"> </span>/opt/vibres
+sudo<span class="w"> </span>systemctl<span class="w"> </span>start<span class="w"> </span>vibres
+</code></pre></div>
+
+<p>관리자 화면 <strong>Settings → Backups</strong> 에서 GUI로 백업/다운로드할 수도 있습니다.</p>
+<hr />
+<h2 id="7-reservations">7. 데이터 구조 (reservations)</h2>
+<table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>비고</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>machine</td>
+<td>text</td>
+<td>O</td>
+<td>예: 진동시험기 1호</td>
+</tr>
+<tr>
+<td>date</td>
+<td>text</td>
+<td>O</td>
+<td><code>YYYY-MM-DD</code> (패턴 검증)</td>
+</tr>
+<tr>
+<td>hour</td>
+<td>number</td>
+<td>—</td>
+<td>0~23 정수. 예약 시작 시각</td>
+</tr>
+<tr>
+<td>name</td>
+<td>text</td>
+<td>O</td>
+<td>예약자</td>
+</tr>
+<tr>
+<td>dept</td>
+<td>text</td>
+<td>X</td>
+<td>부서</td>
+</tr>
+<tr>
+<td>memo</td>
+<td>text</td>
+<td>X</td>
+<td>메모</td>
+</tr>
+<tr>
+<td>email</td>
+<td>email</td>
+<td>X</td>
+<td>이메일</td>
+</tr>
+</tbody>
+</table>
+<p><strong>중복 예약 차단</strong>: <code>(machine, date, hour)</code> 에 UNIQUE 인덱스가 걸려 있어, 두 사람이 동시에<br />
+같은 칸을 눌러도 <strong>DB 레벨에서 한 명만 성공</strong>합니다 (나머지는 HTTP 400).</p>
+<p><strong>API 권한</strong>: 로그인 없이 쓰는 공용앱이므로 조회/등록/삭제는 공개이고,<br />
+<strong>수정(update)은 관리자 전용으로 잠겨 있습니다</strong> (비인증 수정 시도 시 HTTP 403).</p>
+<blockquote>
+<p><code>hour</code> 가 "필수"가 아닌 이유: PocketBase는 숫자 <code>0</code>을 빈 값으로 취급해서,<br />
+필수로 두면 <strong>0시 예약이 거부</strong>됩니다. 대신 min/max(0~23)와 정수 제약으로 검증합니다.</p>
+</blockquote>
+<hr />
+<h2 id="8">8. 동작 확인 (설치 후 점검용)</h2>
+<div class="codehilite"><pre><span></span><code><span class="c1"># 서버 살아있는지</span>
+curl<span class="w"> </span>-s<span class="w"> </span>http://127.0.0.1:8090/api/health
+
+<span class="c1"># 예약 1건 넣어보기</span>
+curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://127.0.0.1:8090/api/collections/reservations/records<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;machine&quot;:&quot;진동시험기 1호&quot;,&quot;date&quot;:&quot;2026-07-27&quot;,&quot;hour&quot;:9,&quot;name&quot;:&quot;홍길동&quot;}&#39;</span>
+
+<span class="c1"># 같은 칸에 또 넣어보기 -&gt; 400 이 나와야 정상 (중복 차단 동작)</span>
+</code></pre></div>
+
+<hr />
+<h2 id="9">9. 다른 플랫폼과 뭐가 다른가요?</h2>
+<p><strong>가입·계정·인터넷 없이 완전 자립 동작</strong>하고, <strong>관리자 화면(예약을 엑셀처럼 직접 편집/삭제)이<br />
+공짜로 딸려오는 것</strong>이 핵심입니다. 구글시트 방식처럼 별도 관리도구를 만들 필요가 없고,<br />
+DB·인증·API가 실행파일 하나에 다 들어 있어 백엔드를 따로 구축할 필요가 없습니다.</p>
+</body>
+</html>

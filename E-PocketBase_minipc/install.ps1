@@ -52,9 +52,11 @@ if ($needDownload) {
 }
 
 # --- 2. 앱 파일 복사 (저장소 → 실행 위치) ------------------------------
-Write-Host "[2/5] 앱 파일 복사 (pb_public, pb_migrations)"
+Write-Host "[2/5] 앱 파일 복사 (pb_public, pb_migrations, pb_hooks)"
 Copy-Item -Recurse -Force (Join-Path $RepoApp "pb_public")     (Join-Path $Root "pb_public")
 Copy-Item -Recurse -Force (Join-Path $RepoApp "pb_migrations") (Join-Path $Root "pb_migrations")
+# 메일 알림 훅. SMTP 미설정이면 아무 일도 하지 않으므로 항상 함께 둔다.
+Copy-Item -Recurse -Force (Join-Path $RepoApp "pb_hooks")      (Join-Path $Root "pb_hooks")
 
 # --- 3. 방화벽 --------------------------------------------------------
 if (-not (Get-NetFirewallRule -DisplayName "vibres $Port" -ErrorAction SilentlyContinue)) {
@@ -66,7 +68,7 @@ if (-not (Get-NetFirewallRule -DisplayName "vibres $Port" -ErrorAction SilentlyC
 
 # --- 4. 자동시작 등록 (작업 스케줄러) ----------------------------------
 Write-Host "[4/5] 부팅 시 자동시작 등록 (작업 스케줄러: $TaskName)"
-$action    = New-ScheduledTaskAction -Execute $exe -Argument "serve --http=0.0.0.0:$Port --dir=$Root\pb_data --publicDir=$Root\pb_public --migrationsDir=$Root\pb_migrations" -WorkingDirectory $Root
+$action    = New-ScheduledTaskAction -Execute $exe -Argument "serve --http=0.0.0.0:$Port --dir=$Root\pb_data --publicDir=$Root\pb_public --migrationsDir=$Root\pb_migrations --hooksDir=$Root\pb_hooks" -WorkingDirectory $Root
 $trigger   = New-ScheduledTaskTrigger -AtStartup
 $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
 $settings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit (New-TimeSpan -Seconds 0)
