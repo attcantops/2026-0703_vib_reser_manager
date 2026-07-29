@@ -67,6 +67,7 @@
   .me-box .nm { color: var(--text); font-weight: 700; font-size: 14px; }
   .me-box button { margin-top: 8px; background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; font-size: 12px; color: #374151; }
   .me-box button:hover { background: #f3f5f7; }
+  .ver { margin-top: 14px; font-size: 11px; color: #aab1b9; letter-spacing: .02em; }
 
   /* ---------- 메인 헤더 ---------- */
   .title { font-size: 18px; font-weight: 700; margin: 0 0 18px; }
@@ -196,6 +197,10 @@
       <a id="navRes" class="on"><span class="ico">▬</span><span id="navResName">진동시험기 1호</span></a>
     </div>
     <div class="me-box" id="meBox"></div>
+    <!-- 화면 버전. update.sh 가 배포할 때 커밋 번호로 채운다.
+         화면이 안 바뀔 때 "서버가 안 올라간 것"과 "브라우저가 옛 화면을 캐시에서
+         꺼내 쓰는 것"을 구분하는 용도다. 이것 때문에 여러 번 헛돌았다. -->
+    <div class="ver" id="ver" title="화면 버전 (배포 커밋)"></div>
   </aside>
 
   <!-- 메인 -->
@@ -848,6 +853,11 @@ function moveBy(dir) {
 /* ============================================================
    시작
    ============================================================ */
+/* 배포 시각·커밋. update.sh 가 아래 자리표시자를 실제 값으로 바꿔 넣는다.
+   그대로 남아 있으면 배포 과정을 거치지 않은 파일(로컬에서 직접 연 것)이다. */
+const BUILD = '__BUILD__';
+$('ver').textContent = /^__/.test(BUILD) ? '화면 버전: 개발용(미배포)' : '화면 버전: ' + BUILD;
+
 loadMe();
 renderMeBox();
 $('navResName').textContent = currentMachine;

@@ -85,6 +85,18 @@ else
 fi
 
 AFTER="$(git -C "$APP_DIR/repo" rev-parse --short HEAD)"
+
+# ── 화면에 배포 버전 찍기 ────────────────────────────────────
+# 화면이 안 바뀔 때 원인이 두 가지다. 서버에 안 올라갔거나, 브라우저가 예전 화면을
+# 캐시에서 꺼내 쓰거나. 눈으로 구분이 안 되면 엉뚱한 곳을 파게 된다(실제로 그랬다).
+# index.html 의 자리표시자를 커밋 번호로 바꿔 화면 좌측 하단에 찍는다.
+# 이 수정으로 저장소가 더러워지지만, 다음 실행의 reset --hard 가 되돌린 뒤 다시 찍는다.
+INDEX="$SRC_DIR/pb_public/index.html"
+if [ -f "$INDEX" ]; then
+  STAMP="$AFTER ($(date '+%m-%d %H:%M'))"
+  sed -i "s/__BUILD__/$STAMP/" "$INDEX" && echo "  화면 버전 표시: $STAMP"
+fi
+
 if [ "$BEFORE" = "$AFTER" ]; then
   echo "  변경 없음 ($AFTER)"
 else
