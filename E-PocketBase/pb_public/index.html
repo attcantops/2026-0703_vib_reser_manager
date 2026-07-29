@@ -591,11 +591,16 @@ function fillHourSelect(sel, from, to, value) {
   if (value != null) sel.value = String(value);
 }
 
-function syncEndOptions() {
+/* reset=true 면 종료 시각을 무조건 시작+1시간으로 되돌린다.
+   창을 새로 열 때가 그렇다. 이걸 안 하면 직전에 고른 종료 시각이 select 에 남아 있어서,
+   한 번 3시간짜리를 예약하고 나면 그 다음 클릭도 3시간짜리로 열린다.
+   시작 시각만 바꾼 경우(reset 없음)에는 이미 고른 종료 시각을 살린다. */
+function syncEndOptions(reset) {
   const s = Number($('nStart').value);
   const prev = Number($('nEnd').value);
   const maxEnd = Math.min(s + CONFIG.maxHours, CONFIG.endHour);
-  fillHourSelect($('nEnd'), s + 1, maxEnd, (prev > s && prev <= maxEnd) ? prev : s + 1);
+  const keep = !reset && prev > s && prev <= maxEnd;
+  fillHourSelect($('nEnd'), s + 1, maxEnd, keep ? prev : s + 1);
 }
 
 function openNew(dateStr, hour) {
@@ -615,7 +620,7 @@ function openNew(dateStr, hour) {
 
   $('nDate').value = d;
   fillHourSelect($('nStart'), CONFIG.startHour, CONFIG.endHour - 1, h);
-  syncEndOptions();
+  syncEndOptions(true);        // 창을 열 때는 항상 1시간짜리로 시작
   $('nMemo').value = '';
   $('newMsg').className = 'mmsg'; $('newMsg').textContent = '';
   $('ovNew').classList.add('show');
@@ -865,7 +870,8 @@ $('btnNew').addEventListener('click', () => openNew(curDate, null));
 $('navMine').addEventListener('click', () => setView('mine'));
 $('navRes').addEventListener('click', () => setView('res'));
 
-$('nStart').addEventListener('change', syncEndOptions);
+// 함수를 그대로 넘기면 Event 객체가 reset 인자로 들어가 항상 초기화된다. 감싸서 넘긴다.
+$('nStart').addEventListener('change', () => syncEndOptions());
 $('nSave').addEventListener('click', saveNew);
 $('nCancel').addEventListener('click', closeNew);
 
