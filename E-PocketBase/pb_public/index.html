@@ -127,8 +127,10 @@
   .cell.busy:hover { filter: brightness(1.05); }
   .cell.busy .memo { font-size: 12px; font-weight: 400; opacity: .85; word-break: break-all; }
   .cell.mine { background: var(--mine); color: #fff; }
-  .cell.past { background: var(--past-bg); color: var(--past-text); cursor: not-allowed; }
-  .cell.past:hover { background: var(--past-bg); }
+  /* 지난 시간도 예약할 수 있다(저장 직전에 한 번 확인). 회색은 금지 표시가 아니라
+     "이미 지난 시각"이라는 안내다. 그래서 커서도 막힘 표시를 쓰지 않는다. */
+  .cell.past { background: var(--past-bg); color: var(--past-text); }
+  .cell.past:hover { background: #eceef0; }
   .cell.past.busy { background: #c3ced8; color: #6f7d8a; }
 
   .legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted); margin-top: 14px; flex-wrap: wrap; }
@@ -140,16 +142,23 @@
   .dot.past { background: var(--past-bg); }
 
   /* ---------- 내 예약 목록 ---------- */
-  .mylist { display: flex; flex-direction: column; gap: 8px; max-width: 720px; }
-  .myitem {
-    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-    border: 1px solid var(--line-soft); border-radius: 6px; padding: 12px 14px;
+  .sech { font-size: 14px; font-weight: 700; margin: 0 0 10px; }
+  .mytable { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 660px; }
+  .mytable th {
+    background: var(--head-bg); font-size: 13px; font-weight: 700; color: #57606a;
+    text-align: left; padding: 12px 16px; white-space: nowrap;
+    border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
   }
-  .myitem .when { font-weight: 700; }
-  .myitem .meta { font-size: 13px; color: var(--muted); flex: 1 1 auto; }
-  .myitem button { border: 1px solid #f0c2c2; background: #fdeeee; color: #a5222b; border-radius: 6px; padding: 6px 12px; font-size: 13px; }
-  .myitem button:hover { background: #fbdede; }
-  .empty { color: var(--muted); padding: 14px 2px; }
+  .mytable td { padding: 14px 16px; border-bottom: 1px solid var(--line-soft); }
+  .mytable tbody tr:hover td { background: #fafbfc; }
+  .mytable td.act { white-space: nowrap; }
+  .mytable td.none { text-align: center; color: var(--muted); padding: 30px 16px; }
+  .mytable .past td { color: var(--muted); }
+  /* 표 안의 동작은 버튼이 아니라 링크 모양으로 둔다. 행마다 버튼이 서면 표가 무거워진다. */
+  .lnk { background: none; border: 0; padding: 0; font-size: 13px; color: var(--primary); font-family: inherit; }
+  .lnk:hover { text-decoration: underline; }
+  .lnk.del { color: #a5222b; }
+  .sep { color: var(--line); margin: 0 9px; }
 
   /* ---------- 메시지 ---------- */
   .msg { padding: 10px 13px; border-radius: 6px; font-size: 13px; margin-top: 16px; display: none; max-width: 720px; }
@@ -233,7 +242,15 @@
 
     <!-- 나의 예약 목록 -->
     <section id="viewMine" style="display:none;">
-      <div class="mylist" id="myList"></div>
+      <h2 class="sech">예약 목록</h2>
+      <div class="tablewrap">
+        <table class="mytable">
+          <thead>
+            <tr><th>분류</th><th>자원명</th><th>예약 시간</th><th>상태</th></tr>
+          </thead>
+          <tbody id="myList"></tbody>
+        </table>
+      </div>
     </section>
 
     <div class="msg" id="msg"></div>
@@ -312,6 +329,7 @@
    설정
    ============================================================ */
 const CONFIG = {
+  category: '진동시험기',     // 목록의 '분류' 칸. 자원 종류가 늘면 자원별 속성으로 옮긴다.
   machines: ['진동시험기 1호'],
   startHour: 8,     // 예약 가능 시작
   endHour: 20,      // 예약 가능 시각은 8..19 (endHour 미만)
@@ -574,8 +592,9 @@ function renderTable() {
         cell.addEventListener('click', () => openDetail(g));
       } else {
         cell.className = 'cell' + (past ? ' past' : '');
-        cell.title = past ? '지난 시간' : (ds + ' ' + ampmMin(hh) + ' ~ ' + ampmMin(hh + 1) + ' · 클릭하여 예약');
-        cell.addEventListener('click', () => { if (!past) openNew(ds, hh); });
+        cell.title = ds + ' ' + ampmMin(hh) + ' ~ ' + ampmMin(hh + 1)
+          + ' · 클릭하여 예약' + (past ? ' (지난 시간)' : '');
+        cell.addEventListener('click', () => openNew(ds, hh));
       }
 
       t.appendChild(cell);
@@ -643,7 +662,10 @@ async function saveNew() {
   if (!date) return newErr('날짜를 선택하세요.');
   if (!(e > s)) return newErr('종료 시각이 시작 시각보다 늦어야 합니다.');
   if (e - s > CONFIG.maxHours) return newErr('연속 최대 ' + CONFIG.maxHours + '시간까지만 예약할 수 있습니다.');
-  if (isPast(date, s)) return newErr('지난 시간은 예약할 수 없습니다.');
+
+  // 지난 시간도 예약할 수 있게 둔다. 시험을 끝내고 나서 기록을 남기는 경우가 있어서다.
+  // 다만 실수로 지난 날짜를 고른 것일 수도 있으니 저장 직전에 한 번 확인한다.
+  if (isPast(date, s) && !confirm('현재 시간 보다 이전 시간을 예약합니다. 계속 하시겠습니까?')) return;
 
   const btn = $('nSave');
   btn.disabled = true; btn.textContent = '저장 중...';
@@ -698,9 +720,9 @@ function openDetail(g) {
     + '<dt>예약 상태</dt><dd>' + (past ? '사용 완료' : '예약 완료') + '</dd>';
 
   const note = $('dNote');
-  if (past) note.textContent = '이미 지난 예약입니다. 삭제할 수 없습니다.';
-  else if (!meReady()) note.textContent = '내 정보(이름·부서)를 설정하면 본인 예약을 삭제할 수 있습니다.';
+  if (!meReady()) note.textContent = '내 정보(이름·부서)를 설정하면 본인 예약을 삭제할 수 있습니다.';
   else if (!mine) note.textContent = '다른 사람의 예약이라 삭제할 수 없습니다.';
+  else if (past) note.textContent = '이미 지난 예약입니다. 삭제하면 사용 기록도 함께 사라집니다.';
   else note.textContent = '';
 
   const btns = $('dBtns');
@@ -710,7 +732,8 @@ function openDetail(g) {
   ok.addEventListener('click', closeDetail);
   btns.appendChild(ok);
 
-  if (mine && !past) {
+  // 지난 예약도 본인 것이면 지울 수 있다. 잘못 넣은 기록을 못 지우면 표가 계속 틀린 채 남는다.
+  if (mine) {
     const del = document.createElement('button');
     del.type = 'button'; del.className = 'del'; del.textContent = '삭제';
     del.addEventListener('click', () => removeGroup(g));
@@ -722,15 +745,16 @@ function closeDetail() { $('ovDetail').classList.remove('show'); }
 
 async function removeGroup(g) {
   if (!isMine(g.recs[0])) { showMsg('본인 예약만 삭제할 수 있습니다.', 'err'); return; }
-  const live = g.recs.filter(r => !isPast(r.date, Number(r.hour)));
-  if (!live.length) { showMsg('이미 지난 예약이라 삭제할 수 없습니다.', 'err'); closeDetail(); return; }
 
+  // 지난 시간도 함께 지운다. 예전에는 지난 것을 남겨뒀는데, 잘못 넣은 기록이
+  // 영영 안 지워져 표가 틀린 채로 남았다.
+  const past = isPast(g.date, g.endHour - 1);
   const label = g.date + ' ' + ampmMin(g.startHour) + ' ~ ' + ampmMin(g.endHour);
   if (!confirm('예약을 삭제하시겠습니까?\n' + label
-      + (live.length !== g.recs.length ? '\n(이미 지난 시간은 제외하고 삭제합니다)' : ''))) return;
+      + (past ? '\n(이미 지난 예약입니다)' : ''))) return;
 
   try {
-    for (const r of live) await pb.collection(CONFIG.collection).delete(r.id);
+    for (const r of g.recs) await pb.collection(CONFIG.collection).delete(r.id);
     closeDetail();
     await load();
     if (view === 'mine') await loadMine();
@@ -744,9 +768,8 @@ async function removeGroup(g) {
    나의 예약 목록
    ============================================================ */
 async function loadMine() {
-  const el = $('myList');
-  if (!meReady()) { el.innerHTML = '<div class="empty">내 정보(이름·부서)를 먼저 입력하세요.</div>'; return; }
-  el.innerHTML = '<div class="empty">불러오는 중...</div>';
+  if (!meReady()) { mineNote('내 정보(이름·부서)를 먼저 입력하세요.'); return; }
+  mineNote('불러오는 중...');
   try {
     const list = await pb.collection(CONFIG.collection).getFullList({
       filter: pb.filter('name = {:n} && dept = {:d} && date >= {:t}',
@@ -755,7 +778,7 @@ async function loadMine() {
     });
     renderMine(groupList(list));
   } catch (err) {
-    el.innerHTML = '';
+    mineNote('불러오지 못했습니다.');
     showMsg('내 예약을 불러오지 못했습니다: ' + fmtErr(err), 'err');
   }
 }
@@ -778,28 +801,44 @@ function groupList(list) {
   return gs;
 }
 
+/* 표 한 칸을 통째로 쓰는 안내 줄 (비었음 / 불러오는 중 / 안내) */
+function mineNote(text) {
+  $('myList').innerHTML = '<tr><td class="none" colspan="4">' + esc(text) + '</td></tr>';
+}
+
 function renderMine(gs) {
   const el = $('myList');
   el.innerHTML = '';
-  if (!gs.length) { el.innerHTML = '<div class="empty">앞으로 잡혀 있는 예약이 없습니다.</div>'; return; }
+  if (!gs.length) { mineNote('리스트가 존재하지 않습니다.'); return; }
+
   for (const g of gs) {
-    const it = document.createElement('div');
-    it.className = 'myitem';
+    const tr = document.createElement('tr');
+    if (isPast(g.date, g.endHour - 1)) tr.className = 'past';
 
-    const w = document.createElement('div');
-    w.className = 'when';
-    w.textContent = g.date + ' (' + dowOf(g.date) + ') ' + ampmMin(g.startHour) + ' ~ ' + ampmMin(g.endHour);
+    const cat = document.createElement('td');
+    cat.textContent = CONFIG.category;
 
-    const m = document.createElement('div');
-    m.className = 'meta';
-    m.textContent = g.machine + ' · ' + (g.endHour - g.startHour) + '시간' + (g.memo ? ' · ' + g.memo : '');
+    const res = document.createElement('td');
+    res.textContent = g.machine;
 
-    const b = document.createElement('button');
-    b.type = 'button'; b.textContent = '삭제';
-    b.addEventListener('click', () => removeGroup(g));
+    const when = document.createElement('td');
+    // 시작·끝 양쪽에 날짜를 적는다. 한쪽만 적으면 며칠짜리인지 헷갈린다.
+    when.textContent = g.date + ' ' + ampmMin(g.startHour) + ' ~ ' + g.date + ' ' + ampmMin(g.endHour);
 
-    it.appendChild(w); it.appendChild(m); it.appendChild(b);
-    el.appendChild(it);
+    const act = document.createElement('td');
+    act.className = 'act';
+    const del = document.createElement('button');
+    del.type = 'button'; del.className = 'lnk del'; del.textContent = '삭제';
+    del.addEventListener('click', () => removeGroup(g));
+    const sep = document.createElement('span');
+    sep.className = 'sep'; sep.textContent = '|';
+    const det = document.createElement('button');
+    det.type = 'button'; det.className = 'lnk'; det.textContent = '상세보기';
+    det.addEventListener('click', () => openDetail(g));
+    act.appendChild(del); act.appendChild(sep); act.appendChild(det);
+
+    tr.appendChild(cat); tr.appendChild(res); tr.appendChild(when); tr.appendChild(act);
+    el.appendChild(tr);
   }
 }
 
