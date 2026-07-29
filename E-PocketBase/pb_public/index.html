@@ -316,7 +316,8 @@
     <div class="note">
       예약자 확인에 씁니다. 이 브라우저에 저장됩니다.<br>
       <b>부서까지 받는 이유</b> — 같은 이름이 둘일 때 서로의 예약을 취소하는 일을 막습니다.<br>
-      <b>이메일을 받는 이유</b> — 다른 사람이 내 예약을 지웠을 때 알 수 있는 유일한 방법입니다.
+      <b>이메일은 선택입니다</b> — 적으시면 다른 사람이 내 예약을 지웠을 때 메일로 알려드립니다.
+      비워두시면 알림을 받지 않습니다.
     </div>
     <div class="mmsg" id="meMsg"></div>
     <div class="frm">
@@ -324,8 +325,8 @@
       <input type="text" id="meName" placeholder="예약자 이름" autocomplete="name">
       <label for="meDept">부서 *</label>
       <input type="text" id="meDept" placeholder="예: 응용기술팀">
-      <label for="meEmail">이메일 *</label>
-      <input type="email" id="meEmail" placeholder="예: hong@cantops.biz" autocomplete="email">
+      <label for="meEmail">이메일</label>
+      <input type="email" id="meEmail" placeholder="(선택) 예: hong@cantops.biz" autocomplete="email">
     </div>
     <div class="mbtns">
       <button type="button" class="pri" id="meSave">저장</button>
@@ -448,7 +449,12 @@ function renderMeBox() {
   const box = $('meBox');
   box.innerHTML = '';
   if (meReady()) {
-    box.innerHTML = '<div class="nm">' + esc(me.name) + '</div><div>' + esc(me.dept) + '</div>';
+    // 이메일을 안 적었으면 알림을 못 받는다는 걸 알려준다. 적었는 줄 알고 있다가
+    // 예약이 지워진 뒤에야 아는 것보다는, 지금 한 줄 보이는 편이 낫다.
+    box.innerHTML = '<div class="nm">' + esc(me.name) + '</div><div>' + esc(me.dept) + '</div>'
+      + (me.email
+          ? '<div style="font-size:12px;margin-top:2px">' + esc(me.email) + '</div>'
+          : '<div style="font-size:12px;margin-top:2px;color:#9ca3af">이메일 없음 · 삭제 알림 안 받음</div>');
   } else {
     box.innerHTML = '<div class="nm">내 정보 없음</div><div>예약하려면 이름·부서가 필요합니다.</div>';
   }
@@ -1046,9 +1052,14 @@ $('meSave').addEventListener('click', () => {
   const mail = $('meEmail').value.trim();
   if (!n) { em.textContent = '이름을 입력하세요.'; em.className = 'mmsg err'; $('meName').focus(); return; }
   if (!d) { em.textContent = '부서를 입력하세요. 동명이인 구분에 필요합니다.'; em.className = 'mmsg err'; $('meDept').focus(); return; }
-  if (CONFIG.requireEmail && !validEmail(mail)) {
-    em.textContent = mail ? '이메일 형식이 올바르지 않습니다.'
-      : '이메일을 입력하세요. 다른 사람이 내 예약을 지웠을 때 알림을 받는 유일한 방법입니다.';
+  // 이메일은 선택이지만, 적었는데 형식이 틀린 것은 잡아준다.
+  // 그대로 두면 본인은 알림을 받는 줄 알고 있는데 실제로는 안 가는 상태가 된다.
+  if (mail && !validEmail(mail)) {
+    em.textContent = '이메일 형식이 올바르지 않습니다. 비워두시면 알림을 받지 않습니다.';
+    em.className = 'mmsg err'; $('meEmail').focus(); return;
+  }
+  if (CONFIG.requireEmail && !mail) {
+    em.textContent = '이메일을 입력하세요.';
     em.className = 'mmsg err'; $('meEmail').focus(); return;
   }
   me.name = n; me.dept = d; me.email = mail;
