@@ -58,7 +58,9 @@
   .nav a:hover { background: #f3f5f7; }
   .nav a.on { background: #eaf2fb; color: var(--primary); font-weight: 700; }
   .nav a .ico { width: 16px; text-align: center; opacity: .75; }
-  .navsec { font-size: 11px; color: var(--muted); font-weight: 700; margin: 16px 0 6px 12px; letter-spacing: .04em; }
+  /* 분류 제목이 이미 구분 역할을 하므로 '자원' 같은 머리말은 두지 않는다.
+     대신 나의 예약 목록과 사이 간격만 준다. */
+  #navResList { margin-top: 14px; }
   /* 분류 제목. 그 아래 자원을 한 단 들여써서 2단 구조가 눈에 들어오게 한다. */
   .navgrp {
     font-size: 13px; font-weight: 700; color: #444c55;
@@ -212,7 +214,6 @@
     <button class="btn-new" id="btnNew" type="button">+ 예약하기</button>
     <div class="nav">
       <a id="navMine"><span class="ico">▤</span>나의 예약 목록</a>
-      <div class="navsec">자원</div>
       <div id="navResList"></div>
     </div>
     <div class="me-box" id="meBox"></div>
