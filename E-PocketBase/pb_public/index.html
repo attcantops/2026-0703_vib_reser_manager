@@ -59,6 +59,14 @@
   .nav a.on { background: #eaf2fb; color: var(--primary); font-weight: 700; }
   .nav a .ico { width: 16px; text-align: center; opacity: .75; }
   .navsec { font-size: 11px; color: var(--muted); font-weight: 700; margin: 16px 0 6px 12px; letter-spacing: .04em; }
+  /* 분류 제목. 그 아래 자원을 한 단 들여써서 2단 구조가 눈에 들어오게 한다. */
+  .navgrp {
+    font-size: 13px; font-weight: 700; color: #444c55;
+    padding: 9px 12px 7px; border-radius: 6px; cursor: pointer;
+  }
+  .navgrp:hover { background: #f3f5f7; }
+  .navgrp.on { color: var(--primary); }
+  .nav a.resitem { padding-left: 24px; font-size: 13px; }
 
   .me-box {
     margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line-soft);
@@ -331,10 +339,20 @@
    설정
    ============================================================ */
 const CONFIG = {
-  category: '진동시험기',     // 목록의 '분류' 칸. 자원 종류가 늘면 자원별 속성으로 옮긴다.
-  // 자원을 늘리려면 여기에 이름만 추가하면 된다. 일간 화면의 열, 사이드바 목록,
-  // 예약창의 자원 선택이 모두 이 배열을 따라간다.
-  machines: ['진동시험기 1호', '진동시험기 2호'],
+  // 자원 목록. 이 배열 하나가 사이드바·일간 화면의 열·예약창의 자원 선택·목록의
+  // 분류 칸을 모두 결정한다. 자원을 늘리려면 여기에 한 줄 추가하면 된다.
+  //
+  // group 은 화면을 나누는 단위다. 일간 화면은 "한 분류의 자원들"을 열로 놓는다.
+  // 분류를 섞어 늘어놓으면 열이 계속 늘어나 비교가 안 되기 때문이다.
+  //
+  // ※ name 은 예약 기록에 그대로 저장된다. 이미 예약이 있는 자원의 이름을 바꾸면
+  //   기존 예약이 어느 열에도 안 잡혀 사라진 것처럼 보인다. 바꿀 때는 기록도 함께 옮겨야 한다.
+  resources: [
+    { group: '시험기',  name: '진동시험기 1호' },
+    { group: '시험기',  name: '진동시험기 2호' },
+    { group: 'TestBed', name: 'TestBed 1호' },
+    { group: 'TestBed', name: 'TestBed 2호' },
+  ],
   startHour: 8,     // 예약 가능 시작
   endHour: 20,      // 예약 가능 시각은 8..19 (endHour 미만)
   maxHours: 8,      // 연속 최대
@@ -361,7 +379,23 @@ function isMine(rec) { return meReady() && rec.name === me.name && (rec.dept || 
 /* ============================================================
    상태
    ============================================================ */
-let currentMachine = CONFIG.machines[0];
+/* 자원 목록 조회 helper — CONFIG.resources 를 여기저기서 직접 훑지 않도록 모아둔다 */
+function groupNames() {
+  const seen = [];
+  for (const r of CONFIG.resources) if (!seen.includes(r.group)) seen.push(r.group);
+  return seen;
+}
+function machinesOf(group) {
+  return CONFIG.resources.filter(r => r.group === group).map(r => r.name);
+}
+function groupOf(machine) {
+  const r = CONFIG.resources.find(x => x.name === machine);
+  return r ? r.group : CONFIG.resources[0].group;
+}
+function allMachines() { return CONFIG.resources.map(r => r.name); }
+
+let currentGroup = CONFIG.resources[0].group;
+let currentMachine = CONFIG.resources[0].name;
 let view = 'res';               // 'res' | 'mine'
 let mode = 'day';               // 'day' | 'week'
 let curDate = null;
@@ -513,7 +547,7 @@ function renderDateLabel() {
    일간 = 자원을 나란히 (하루를 자원별로 비교). 주간 = 선택한 자원의 7일. */
 function columnsOf() {
   if (mode === 'day') {
-    return CONFIG.machines.map(m => ({ machine: m, date: curDate, kind: 'machine' }));
+    return machinesOf(currentGroup).map(m => ({ machine: m, date: curDate, kind: 'machine' }));
   }
   return Array.from({ length: 7 }, (_, i) => ({
     machine: currentMachine, date: dateAdd(weekStart, i), kind: 'date',
@@ -654,9 +688,10 @@ function openNew(dateStr, hour, machine) {
   const d = dateStr || curDate;
   const h = (hour == null) ? Math.max(CONFIG.startHour, Math.min(new Date().getHours() + 1, CONFIG.endHour - 1)) : hour;
 
+  // 분류를 가리지 않고 전부 담는다. 창을 연 뒤에도 다른 분류의 자원으로 바꿀 수 있어야 한다.
   const ms = $('nMachine');
   ms.innerHTML = '';
-  CONFIG.machines.forEach(m => {
+  allMachines().forEach(m => {
     const o = document.createElement('option');
     o.value = m; o.textContent = m;
     ms.appendChild(o);
@@ -839,7 +874,7 @@ function renderMine(gs) {
     if (isPast(g.date, g.endHour - 1)) tr.className = 'past';
 
     const cat = document.createElement('td');
-    cat.textContent = CONFIG.category;
+    cat.textContent = groupOf(g.machine);
 
     const res = document.createElement('td');
     res.textContent = g.machine;
@@ -889,22 +924,44 @@ function fmtErr(err) {
 function renderResNav() {
   const box = $('navResList');
   box.innerHTML = '';
-  CONFIG.machines.forEach(m => {
-    const a = document.createElement('a');
-    if (view === 'res' && m === currentMachine) a.className = 'on';
-    const ico = document.createElement('span');
-    ico.className = 'ico'; ico.textContent = '▬';
-    a.appendChild(ico);
-    a.appendChild(document.createTextNode(m));
-    a.addEventListener('click', () => { currentMachine = m; setView('res'); });
-    box.appendChild(a);
+
+  groupNames().forEach(gname => {
+    // 분류 제목 — 누르면 그 분류의 자원들을 열로 놓은 일간 화면
+    const h = document.createElement('div');
+    h.className = 'navgrp' + (view === 'res' && gname === currentGroup ? ' on' : '');
+    h.textContent = gname;
+    h.title = gname + ' 일간 보기';
+    h.addEventListener('click', () => {
+      currentGroup = gname;
+      // 분류를 옮기면 선택된 자원도 그 분류 것으로 따라가야 한다.
+      // 안 그러면 주간으로 전환했을 때 엉뚱한 분류의 자원이 나온다.
+      if (groupOf(currentMachine) !== gname) currentMachine = machinesOf(gname)[0];
+      setMode('day');
+    });
+    box.appendChild(h);
+
+    // 자원 — 누르면 그 자원의 주간 화면
+    machinesOf(gname).forEach(m => {
+      const a = document.createElement('a');
+      a.className = 'resitem' + (view === 'res' && m === currentMachine ? ' on' : '');
+      const ico = document.createElement('span');
+      ico.className = 'ico'; ico.textContent = '▬';
+      a.appendChild(ico);
+      a.appendChild(document.createTextNode(m));
+      a.title = m + ' 주간 보기';
+      a.addEventListener('click', () => {
+        currentMachine = m; currentGroup = groupOf(m);
+        setMode('week');
+      });
+      box.appendChild(a);
+    });
   });
 }
 
-/* 일간은 자원 전체를 보여주므로 제목도 종류로, 주간은 자원 하나라 그 이름으로 */
+/* 일간은 한 분류의 자원 전체를 보여주므로 제목도 분류로, 주간은 자원 하나라 그 이름으로 */
 function updateTitle() {
   $('mainTitle').textContent = (view !== 'res') ? '나의 예약 목록'
-    : (mode === 'day' ? CONFIG.category : currentMachine);
+    : (mode === 'day' ? currentGroup : currentMachine);
 }
 
 function setView(v) {
