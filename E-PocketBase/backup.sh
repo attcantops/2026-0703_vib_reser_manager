@@ -14,6 +14,11 @@
 #   REMOTE="사용자@192.168.0.8:/d/backup/vibres"
 #   SSH_KEY="/root/.ssh/id_ed25519"
 #
+# 이 장치에 붙인 별도 디스크(외장 USB 등)에도 사본을 둘 수 있다:
+#   ARCHIVE_DIR="/mnt/vibres-backup/vibres"
+#   ARCHIVE_KEEP=180
+# SD카드와 그 디스크 양쪽에 쓴다. 한쪽에만 두면 그쪽이 새로운 단일 실패점이 된다.
+#
 # cron 예시 (매일 03:10, PocketBase 내장 백업 03:00 이후):
 #   10 3 * * * /opt/vibres/backup.sh --push >> /var/log/vibres-backup.log 2>&1
 
@@ -71,6 +76,45 @@ log "무결성 확인 OK"
 ls -1t "$OUT_DIR"/vibres-*.tar.gz 2>/dev/null | tail -n +$((KEEP + 1)) | while read -r f; do
   rm -f "$f" && log "오래된 백업 삭제: $(basename "$f")"
 done
+
+# ── 이 장치에 붙인 별도 디스크로 사본 ────────────────────────
+# SD카드가 죽어도 남게 하려는 것이므로, 그 디스크가 실제로 마운트돼 있는지
+# 반드시 확인한다. 마운트가 풀린 상태에서 그냥 쓰면 파일은 SD카드의 빈 폴더에
+# 쌓이고, 겉보기에는 백업이 되는 것처럼 보인다. 정작 필요할 때 없는 것보다
+# 나쁜 상태다.
+#
+# 마운트가 없어도 스크립트를 실패로 끝내지는 않는다. SD카드 사본과 PC 회수는
+# 이미 끝났으므로 백업 자체는 성립했다. 대신 눈에 띄게 경고한다.
+CONF_ARCHIVE_DIR=""
+if [ -f "$CONF" ]; then
+  # shellcheck source=/dev/null
+  . "$CONF"
+  CONF_ARCHIVE_DIR="${ARCHIVE_DIR:-}"
+fi
+
+if [ -n "$CONF_ARCHIVE_DIR" ]; then
+  AKEEP="${ARCHIVE_KEEP:-180}"
+  # 마운트 지점은 보통 상위 디렉터리다 (/mnt/vibres-backup/vibres -> /mnt/vibres-backup)
+  MP="$CONF_ARCHIVE_DIR"
+  while [ "$MP" != "/" ] && ! mountpoint -q "$MP" 2>/dev/null; do MP="$(dirname "$MP")"; done
+
+  if [ "$MP" = "/" ]; then
+    log "[경고] 사본 디스크가 마운트돼 있지 않습니다: $CONF_ARCHIVE_DIR"
+    log "[경고]   이번 백업은 SD카드에만 남습니다. 외장 디스크 연결을 확인하세요."
+  else
+    mkdir -p "$CONF_ARCHIVE_DIR"
+    COPY="$CONF_ARCHIVE_DIR/$(basename "$ARCHIVE")"
+    if cp -f "$ARCHIVE" "$COPY" && sync && tar tzf "$COPY" >/dev/null 2>&1; then
+      log "사본 생성: $COPY  (마운트: $MP)"
+      ls -1t "$CONF_ARCHIVE_DIR"/vibres-*.tar.gz 2>/dev/null | tail -n +$((AKEEP + 1)) | while read -r f; do
+        rm -f "$f" && log "오래된 사본 삭제: $(basename "$f")"
+      done
+    else
+      rm -f "$COPY" 2>/dev/null || true
+      log "[경고] 사본 생성에 실패했습니다: $CONF_ARCHIVE_DIR (디스크 상태를 확인하세요)"
+    fi
+  fi
+fi
 
 # ── 장치 바깥으로 내보내기 ───────────────────────────────────
 if [ -n "$PUSH" ]; then
