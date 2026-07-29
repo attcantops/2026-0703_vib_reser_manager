@@ -376,7 +376,11 @@ function analyze(records, machines, from, to, basis) {
   const topShare = used ? byUser.slice(0, topN).reduce((s, u) => s + u.hours, 0) / used : 0;
 
   const leads = bookings.map(leadDays).filter(x => x != null && x >= 0);
-  const peak = byHour.reduce((a, b) => (b.hours > a.hours ? b : a), byHour[0] || { hour: 0, hours: 0 });
+
+  // 피크는 여러 시간대가 나란히 최대일 수 있다. 첫 번째만 집으면 요약에는 10시만
+  // 나오는데 아래 막대그래프에는 10시와 15시가 둘 다 빨갛게 서서 서로 어긋난다.
+  const peakMax = Math.max(0, ...byHour.map(x => x.hours));
+  const peaks = peakMax > 0 ? byHour.filter(x => x.hours === peakMax) : [];
 
   return {
     from, to, basis, machines, days: days.length, HPD,
@@ -387,7 +391,7 @@ function analyze(records, machines, from, to, basis) {
     users: byUser.length,
     dailyAvg: days.length ? used / days.length : 0,
     byMachine, byUser, byDept, byHour, byDow,
-    topN, topShare, peak,
+    topN, topShare, peaks, peakMax,
     leadAvg: leads.length ? leads.reduce((a, b) => a + b, 0) / leads.length : null,
     leadMed: median(leads),
   };
@@ -426,7 +430,7 @@ function render(a) {
     + tile('총 사용시간', hrs(a.used), '일평균 ' + hrs(a.dailyAvg))
     + tile('예약 건수', num(a.bookings) + '건', '평균 ' + hrs(a.avgSession) + '/건')
     + tile('이용자', num(a.users) + '명', a.users ? '1인 평균 ' + hrs(a.used / a.users) : '-')
-    + tile('가장 붐비는 시간', a.peak && a.peak.hours ? ampm(a.peak.hour) : '-', a.peak && a.peak.hours ? hrs(a.peak.hours) + ' 예약' : '')
+    + tile('가장 붐비는 시간', peakLabel(a.peaks), a.peakMax ? hrs(a.peakMax) + ' 예약' : '')
     + tile('사전 예약', a.leadMed != null ? a.leadMed + '일 전' : '-', a.leadAvg != null ? '평균 ' + (Math.round(a.leadAvg * 10) / 10) + '일' : '')
     + '</div>';
 
@@ -503,6 +507,14 @@ function render(a) {
     + '<b>사전 예약</b> = 예약을 잡은 날부터 실제 사용일까지의 일수. 중앙값을 먼저 보는 편이 평균보다 실제에 가깝습니다.<br>'
     + '<b>예약 건수</b>는 연속된 시간을 한 건으로 묶어 셉니다. 9~12시 예약은 3시간 1건입니다.<br>'
     + '이 통계는 <b>예약 기록</b>만으로 계산합니다. 실제 가동 여부(예약하고 안 쓴 경우)나 고장 정지 시간은 기록이 없어 반영되지 않습니다.';
+}
+
+/* 동률이면 함께 적는다. 셋 이상이면 두 개까지만 적고 나머지는 개수로 줄인다. */
+function peakLabel(peaks) {
+  if (!peaks || !peaks.length) return '-';
+  if (peaks.length === 1) return ampm(peaks[0].hour);
+  if (peaks.length === 2) return ampm(peaks[0].hour) + ', ' + ampm(peaks[1].hour);
+  return ampm(peaks[0].hour) + ' 외 ' + (peaks.length - 1) + '곳';
 }
 
 function tile(k, v, s, hi) {
