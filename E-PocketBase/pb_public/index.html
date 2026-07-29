@@ -96,6 +96,8 @@
   .th.sat { color: #1a73c7; }
   .th.sun { color: #d1242f; }
   .th.today { background: #eaf2fb; color: var(--primary); }
+  /* 주간 보기의 대상이 되는 자원 */
+  .th.sel { box-shadow: inset 0 -3px 0 var(--primary); color: var(--primary); }
   .th.clickable { cursor: pointer; }
   .th.clickable:hover { background: #e6ebf0; }
   .th .dow { display: block; font-size: 11px; font-weight: 600; opacity: .85; margin-top: 1px; }
@@ -203,7 +205,7 @@
     <div class="nav">
       <a id="navMine"><span class="ico">▤</span>나의 예약 목록</a>
       <div class="navsec">자원</div>
-      <a id="navRes" class="on"><span class="ico">▬</span><span id="navResName">진동시험기 1호</span></a>
+      <div id="navResList"></div>
     </div>
     <div class="me-box" id="meBox"></div>
     <!-- 화면 버전. update.sh 가 배포할 때 커밋 번호로 채운다.
@@ -330,7 +332,9 @@
    ============================================================ */
 const CONFIG = {
   category: '진동시험기',     // 목록의 '분류' 칸. 자원 종류가 늘면 자원별 속성으로 옮긴다.
-  machines: ['진동시험기 1호'],
+  // 자원을 늘리려면 여기에 이름만 추가하면 된다. 일간 화면의 열, 사이드바 목록,
+  // 예약창의 자원 선택이 모두 이 배열을 따라간다.
+  machines: ['진동시험기 1호', '진동시험기 2호'],
   startHour: 8,     // 예약 가능 시작
   endHour: 20,      // 예약 가능 시각은 8..19 (endHour 미만)
   maxHours: 8,      // 연속 최대
@@ -450,13 +454,14 @@ async function load() {
   const { from, to } = viewRange();
   if (!from || !to) return;
   try {
+    // 자원을 가리지 않고 기간 전체를 받는다. 일간 화면이 자원을 열로 나란히 놓기
+    // 때문에 한 자원만 받아서는 화면을 못 그린다. 하루~일주일치라 양도 적다.
     const list = await pb.collection(CONFIG.collection).getFullList({
-      filter: pb.filter('machine = {:m} && date >= {:f} && date <= {:t}',
-                        { m: currentMachine, f: from, t: to }),
+      filter: pb.filter('date >= {:f} && date <= {:t}', { f: from, t: to }),
       sort: 'date,hour',
     });
     recordMap = new Map();
-    for (const r of list) recordMap.set(r.date + '|' + Number(r.hour), r);
+    for (const r of list) recordMap.set(r.machine + '|' + r.date + '|' + Number(r.hour), r);
     renderTable();
     renderDateLabel();
   } catch (err) {
@@ -464,14 +469,14 @@ async function load() {
   }
 }
 
-function recordAt(d, h) { return recordMap.get(d + '|' + h); }
+function recordAt(m, d, h) { return recordMap.get(m + '|' + d + '|' + h); }
 
-/* 같은 날짜·예약자의 연속 시간을 한 블록으로 묶는다 */
-function groupsForDate(dateStr) {
+/* 같은 자원·날짜·예약자의 연속 시간을 한 블록으로 묶는다 */
+function groupsForDate(machine, dateStr) {
   const groups = [];
   let cur = null;
   for (let h = CONFIG.startHour; h < CONFIG.endHour; h++) {
-    const rec = recordAt(dateStr, h);
+    const rec = recordAt(machine, dateStr, h);
     if (rec && cur && cur.name === rec.name && (cur.dept || '') === (rec.dept || '') && cur.endHour === h) {
       cur.endHour = h + 1; cur.recs.push(rec);
     } else if (rec) {
@@ -504,12 +509,23 @@ function renderDateLabel() {
     : mmdd(weekStart) + ' ~ ' + mmdd(dateAdd(weekStart, 6)) + ' (주간)';
 }
 
+/* 표의 열 목록.
+   일간 = 자원을 나란히 (하루를 자원별로 비교). 주간 = 선택한 자원의 7일. */
+function columnsOf() {
+  if (mode === 'day') {
+    return CONFIG.machines.map(m => ({ machine: m, date: curDate, kind: 'machine' }));
+  }
+  return Array.from({ length: 7 }, (_, i) => ({
+    machine: currentMachine, date: dateAdd(weekStart, i), kind: 'date',
+  }));
+}
+
 function renderTable() {
   const t = $('rtable');
   t.innerHTML = '';
-  const cols = (mode === 'day') ? 1 : 7;
+  const columns = columnsOf();
   t.className = 'rtable' + (mode === 'week' ? ' week' : '');
-  t.style.gridTemplateColumns = '96px repeat(' + cols + ', minmax(84px, 1fr))';
+  t.style.gridTemplateColumns = '96px repeat(' + columns.length + ', minmax(84px, 1fr))';
   // 시간 행 높이를 값으로 고정한다. auto 로 두면 그 행에 무엇이 들어있느냐에 따라
   // 행마다 높이가 달라진다. 고정해 두면 예약이 있든 없든 모든 칸이 같은 크기다.
   //
@@ -529,20 +545,24 @@ function renderTable() {
   corner.innerHTML = '&nbsp;';
   t.appendChild(corner);
 
-  const dates = (mode === 'day') ? [curDate] : Array.from({ length: 7 }, (_, i) => dateAdd(weekStart, i));
-
-  dates.forEach((ds, i) => {
+  columns.forEach((c, i) => {
     const th = document.createElement('div');
-    const dw = parseDate(ds).getDay();
-    th.className = 'th' + (mode === 'week' ? ' clickable' : '')
-      + (ds === today ? ' today' : '') + (dw === 6 ? ' sat' : '') + (dw === 0 ? ' sun' : '');
     th.style.gridRow = '1'; th.style.gridColumn = String(i + 2);
-    th.innerHTML = (mode === 'day')
-      ? esc(currentMachine)
-      : mmdd(ds) + '<span class="dow">' + DOW[dw] + '</span>';
-    if (mode === 'week') {
-      th.title = ds + ' 일간 보기';
-      th.addEventListener('click', () => { curDate = ds; setMode('day'); });
+
+    if (c.kind === 'machine') {
+      // 선택된 자원을 표시해 둔다. 사이드바에서 자원을 고르면 주간 보기의 대상이 되므로,
+      // 지금 무엇이 선택돼 있는지 일간 화면에서도 보여야 한다.
+      th.className = 'th clickable' + (c.machine === currentMachine ? ' sel' : '');
+      th.textContent = c.machine;
+      th.title = c.machine + ' 주간 보기';
+      th.addEventListener('click', () => { currentMachine = c.machine; setMode('week'); });
+    } else {
+      const dw = parseDate(c.date).getDay();
+      th.className = 'th clickable' + (c.date === today ? ' today' : '')
+        + (dw === 6 ? ' sat' : '') + (dw === 0 ? ' sun' : '');
+      th.innerHTML = mmdd(c.date) + '<span class="dow">' + DOW[dw] + '</span>';
+      th.title = c.date + ' 일간 보기';
+      th.addEventListener('click', () => { curDate = c.date; setMode('day'); });
     }
     t.appendChild(th);
   });
@@ -560,10 +580,11 @@ function renderTable() {
   // 여러 시간에 걸친 예약이라도 칸을 병합(span)하지 않는다. 1시간 = 1칸이고
   // 행 높이가 고정이라, 예약 길이와 무관하게 모든 칸이 같은 크기로 남는다.
   // 연속 예약은 같은 색으로 이어 붙이고 사이 경계선만 옅게 해서 한 덩어리로 보이게 한다.
-  dates.forEach((ds, i) => {
+  columns.forEach((c, i) => {
     const col = String(i + 2);
+    const ds = c.date;
     const gOf = new Map();                // 시각 -> 그 시각이 속한 예약 그룹
-    for (const g of groupsForDate(ds)) {
+    for (const g of groupsForDate(c.machine, ds)) {
       for (let h = g.startHour; h < g.endHour; h++) gOf.set(h, g);
     }
 
@@ -592,9 +613,9 @@ function renderTable() {
         cell.addEventListener('click', () => openDetail(g));
       } else {
         cell.className = 'cell' + (past ? ' past' : '');
-        cell.title = ds + ' ' + ampmMin(hh) + ' ~ ' + ampmMin(hh + 1)
+        cell.title = c.machine + ' · ' + ds + ' ' + ampmMin(hh) + ' ~ ' + ampmMin(hh + 1)
           + ' · 클릭하여 예약' + (past ? ' (지난 시간)' : '');
-        cell.addEventListener('click', () => openNew(ds, hh));
+        cell.addEventListener('click', () => openNew(ds, hh, c.machine));
       }
 
       t.appendChild(cell);
@@ -627,7 +648,7 @@ function syncEndOptions(reset) {
   fillHourSelect($('nEnd'), s + 1, maxEnd, keep ? prev : s + 1);
 }
 
-function openNew(dateStr, hour) {
+function openNew(dateStr, hour, machine) {
   if (!meReady()) { showMsg('먼저 내 정보(이름·부서)를 입력하세요.', 'err'); openMe(); return; }
 
   const d = dateStr || curDate;
@@ -640,7 +661,7 @@ function openNew(dateStr, hour) {
     o.value = m; o.textContent = m;
     ms.appendChild(o);
   });
-  ms.value = currentMachine;
+  ms.value = machine || currentMachine;   // 클릭한 열의 자원이 그대로 선택되게
 
   $('nDate').value = d;
   fillHourSelect($('nStart'), CONFIG.startHour, CONFIG.endHour - 1, h);
@@ -774,7 +795,9 @@ async function loadMine() {
     const list = await pb.collection(CONFIG.collection).getFullList({
       filter: pb.filter('name = {:n} && dept = {:d} && date >= {:t}',
                         { n: me.name, d: me.dept, t: todayStr() }),
-      sort: 'date,hour',
+      // machine 을 hour 앞에 둔다. 자원이 둘 이상이면 같은 날짜의 두 자원 예약이
+      // 시간순으로 섞여, 연속 시간을 한 줄로 묶는 groupList 가 잘게 쪼개진다.
+      sort: 'date,machine,hour',
     });
     renderMine(groupList(list));
   } catch (err) {
@@ -861,14 +884,37 @@ function fmtErr(err) {
 /* ============================================================
    화면 전환
    ============================================================ */
+/* 사이드바 자원 목록. 자원을 고르면 주간 보기의 대상이 된다.
+   (일간은 자원을 모두 열로 보여주므로 선택은 강조 표시로만 나타난다) */
+function renderResNav() {
+  const box = $('navResList');
+  box.innerHTML = '';
+  CONFIG.machines.forEach(m => {
+    const a = document.createElement('a');
+    if (view === 'res' && m === currentMachine) a.className = 'on';
+    const ico = document.createElement('span');
+    ico.className = 'ico'; ico.textContent = '▬';
+    a.appendChild(ico);
+    a.appendChild(document.createTextNode(m));
+    a.addEventListener('click', () => { currentMachine = m; setView('res'); });
+    box.appendChild(a);
+  });
+}
+
+/* 일간은 자원 전체를 보여주므로 제목도 종류로, 주간은 자원 하나라 그 이름으로 */
+function updateTitle() {
+  $('mainTitle').textContent = (view !== 'res') ? '나의 예약 목록'
+    : (mode === 'day' ? CONFIG.category : currentMachine);
+}
+
 function setView(v) {
   view = v;
   const res = v === 'res';
   $('viewRes').style.display = res ? '' : 'none';
   $('viewMine').style.display = res ? 'none' : '';
-  $('navRes').classList.toggle('on', res);
   $('navMine').classList.toggle('on', !res);
-  $('mainTitle').textContent = res ? currentMachine : '나의 예약 목록';
+  renderResNav();
+  updateTitle();
   clearMsg();
   if (res) load(); else loadMine();
 }
@@ -879,6 +925,8 @@ function setMode(m) {
   $('btnWeek').classList.toggle('on', m === 'week');
   if (m === 'week') weekStart = mondayOf(curDate);
   $('date').value = curDate;
+  updateTitle();
+  renderResNav();
   if (view !== 'res') setView('res'); else load();
 }
 
@@ -899,7 +947,8 @@ $('ver').textContent = /^__/.test(BUILD) ? '화면 버전: 개발용(미배포)'
 
 loadMe();
 renderMeBox();
-$('navResName').textContent = currentMachine;
+renderResNav();
+updateTitle();
 curDate = todayStr();
 weekStart = mondayOf(curDate);
 $('date').value = curDate;
@@ -917,7 +966,6 @@ $('btnWeek').addEventListener('click', () => setMode('week'));
 
 $('btnNew').addEventListener('click', () => openNew(curDate, null));
 $('navMine').addEventListener('click', () => setView('mine'));
-$('navRes').addEventListener('click', () => setView('res'));
 
 // 함수를 그대로 넘기면 Event 객체가 reset 인자로 들어가 항상 초기화된다. 감싸서 넘긴다.
 $('nStart').addEventListener('change', () => syncEndOptions());
