@@ -437,16 +437,19 @@ function analyze(records, machines, from, to, basis) {
   };
 }
 
-/* 월별 가동률 추이.
+/* 연간 월별 가동률 — 1월, 2월, 3월 … 을 한 해 단위로 나란히 놓는다.
  *
  * 선택한 기간과 별개의 창을 쓴다. 기간에 묶어 두면 기본값인 '이번 달'에서는
- * 한 줄짜리 표가 되어 비교가 되지 않고, 그러면 추이를 보려고 기간을 일부러
- * 늘려야 한다. 추이는 늘 보여야 하는 정보라 따로 낸다.
+ * 한 줄짜리 표가 되어 비교가 되지 않고, 그러면 표를 보려고 기간을 일부러
+ * 늘려야 한다. 늘 보여야 하는 정보라 따로 낸다.
  *
  * 가용시간을 달마다 다시 세는 것이 핵심이다. 달에 따라 평일이 20일이었다가
  * 23일이 되므로, 사용시간만 비교하면 짧은 달이 부당하게 낮아 보인다.
+ *
+ * firstDate = 전체 기록 중 가장 이른 날. 그보다 앞선 달은 '안 썼다'가 아니라
+ * '집계할 기록이 없던 기간'이라 0% 대신 '기록 없음'으로 구분해 적는다.
  */
-function buildTrend(records, machines, basis, tFrom, tTo) {
+function buildTrend(records, machines, basis, tFrom, tTo, firstDate) {
   const HPD = CONFIG.endHour - CONFIG.startHour;
   const today = todayStr();
   return monthsIn(tFrom, tTo)
@@ -464,19 +467,17 @@ function buildTrend(records, machines, basis, tFrom, tTo) {
       const mu = records.filter(r => mset.has(r.date)).length;
       const mcap = md.length * HPD * machines.length;
       return {
-        ym: mo.ym, partial: mo.partial, from: mo.from, to: mEff,
+        ym: mo.ym, month: mm, partial: mo.partial, from: mo.from, to: mEff,
         ongoing: monthEnd > today,                     // 아직 안 끝난 달
+        // 기록이 시작되기 전의 달. 0% 와 구분해야 한다 — 안 쓴 것이 아니라 잴 수 없던 것이다.
+        noData: !!firstDate && monthEnd < firstDate,
         days: md.length, used: mu, capacity: mcap, util: mcap ? mu / mcap : 0,
         // 앞으로 잡힌 예약은 그 달 끝까지 센다. 조회 창이 오늘까지여도
         // 이달 남은 날에 잡힌 예약은 알려줘야 한다.
         future: records.filter(r => r.date > mEff && r.date <= monthEnd).length,
       };
     })
-    .filter(Boolean)
-    // 기록이 시작되기 전의 달은 떼어낸다. 예약 제도를 쓰기 전 달까지 0% 로 그리면
-    // "장비를 놀렸다"로 읽히는데, 실제로는 집계할 기록 자체가 없던 기간이다.
-    // 뒤쪽의 0% 는 남긴다. 쓰다가 안 쓰게 된 것은 실제 정보다.
-    .reduce((acc, m) => (acc.length || m.used > 0 ? (acc.push(m), acc) : acc), []);
+    .filter(Boolean);
 }
 
 /* 가동률 해석. 설비·시설 운영에서 흔히 쓰는 구간이다.
@@ -538,29 +539,38 @@ function render(a) {
 
   // ── 월별 추이 ──
   // 한 달만 걸치면 요약 타일과 같은 숫자 하나뿐이라 표를 만들 이유가 없다.
-  if (a.trend.length > 1) {
-    const maxU = Math.max(0.0001, ...a.trend.map(x => x.util));
-    h += '<div class="sec"><h2>월별 가동률 추이</h2>'
-      + '<p class="desc">위 기간과 별개로 <b>최근 6개월</b>을 봅니다(' + a.trendFrom + ' ~ ' + a.trendTo + '). '
+  if (a.trend.length) {
+    const live = a.trend.filter(m => !m.noData);
+    const maxU = Math.max(0.0001, ...live.map(x => x.util));
+    const yearUsed = live.reduce((s, m) => s + m.used, 0);
+    const yearCap = live.reduce((s, m) => s + m.capacity, 0);
+
+    h += '<div class="sec"><h2>' + a.trendYear + '년 월별 가동률</h2>'
+      + '<p class="desc">위 기간과 별개로 <b>' + a.trendYear + '년 1월부터</b> 달마다 나란히 놓고 봅니다. '
       + '달마다 평일 수가 다르므로 가용시간도 달마다 다시 셉니다. 그래서 달끼리 바로 비교됩니다. '
       + '아직 안 끝난 달은 <b>오늘까지</b>만 계산합니다 — 남은 날을 가용시간에 넣으면 그 달만 낮게 나와 비교가 망가집니다. '
       + '가동률은 비율이라 15일치와 30일치를 그대로 견줄 수 있습니다. '
       + '증감은 %p(퍼센트포인트)입니다 — 30%에서 33%가 되면 3%p 늘어난 것입니다.</p>'
       + '<table><thead><tr><th>월</th><th class="num">사용시간</th><th class="num">가용시간</th>'
       + '<th>가동률</th><th class="num">%</th><th class="num">전월 대비</th></tr></thead><tbody>';
-    a.trend.forEach((m, i) => {
-      const prev = i > 0 ? a.trend[i - 1].util : null;
+
+    let prevUtil = null;                                  // 기록 없는 달은 건너뛰고 이어 붙인다
+    a.trend.forEach(m => {
+      if (m.noData) {
+        h += '<tr><td>' + m.month + '월</td>'
+          + '<td class="num" colspan="5" style="text-align:left;color:var(--muted)">기록 없음</td></tr>';
+        return;
+      }
       let dtxt = '-';
-      if (prev != null) {
-        const d = (m.util - prev) * 100;
+      if (prevUtil != null) {
+        const d = (m.util - prevUtil) * 100;
         dtxt = Math.abs(d) < 0.05 ? '—'
           : (d > 0 ? '▲' : '▼') + (Math.round(Math.abs(d) * 10) / 10).toFixed(1) + '%p';
       }
+      prevUtil = m.util;
       h += '<tr>'
-        + '<td>' + m.ym
-          + (m.ongoing
-              ? ' <span style="color:var(--muted);font-size:12px">진행 중 (~' + m.to.slice(5) + ', ' + m.days + '일)</span>'
-              : (m.partial ? ' <span style="color:var(--muted);font-size:12px">일부(' + m.from.slice(5) + '~' + m.to.slice(5) + ')</span>' : ''))
+        + '<td>' + m.month + '월'
+          + (m.ongoing ? ' <span style="color:var(--muted);font-size:12px">진행 중 (~' + m.to.slice(5) + ', ' + m.days + '일)</span>' : '')
           + '</td>'
         + '<td class="num">' + hrs(m.used) + '</td>'
         + '<td class="num">' + hrs(m.capacity) + '</td>'
@@ -570,7 +580,15 @@ function render(a) {
         + '<td class="num">' + dtxt + '</td>'
         + '</tr>';
     });
-    h += '</tbody></table></div>';
+
+    // 연 누계. 달을 훑고 나면 "그래서 올해 전체로는?" 이 바로 이어진다.
+    h += '</tbody><tfoot><tr>'
+      + '<th>' + a.trendYear + '년 누계</th>'
+      + '<th class="num">' + hrs(yearUsed) + '</th>'
+      + '<th class="num">' + hrs(yearCap) + '</th>'
+      + '<th></th>'
+      + '<th class="num">' + pct(yearCap ? yearUsed / yearCap : 0) + '</th>'
+      + '<th></th></tr></tfoot></table></div>';
   }
 
   // ── 자원별 ──
@@ -696,30 +714,40 @@ async function run() {
   const prevTo = dateAdd(from, -1);
   const prevFrom = dateAdd(prevTo, -(span - 1));
 
-  // 월별 추이 창 — 선택 기간이 짧아도 최소 6개월은 보여준다.
-  // 기간에 묶으면 '이번 달'에서는 한 줄뿐이라 추이가 안 보인다.
-  const trendEnd = effTo < from ? to : effTo;
-  const te = parseDate(trendEnd);
-  const trendFromCand = fmtYmd(new Date(te.getFullYear(), te.getMonth() - 5, 1));
-  const trendFrom = trendFromCand < from ? trendFromCand : from;
+  // 월별 표 창 — 선택 기간이 속한 해의 1월 ~ 12월(오늘까지).
+  // 1월·2월·3월 … 을 나란히 놓고 보는 형태다. 선택 기간에 묶으면 '이번 달'에서는
+  // 한 줄뿐이라 비교가 안 된다.
+  const year = parseDate(effTo < from ? to : effTo).getFullYear();
+  const trendFrom = year + '-01-01';
+  const yearEnd = year + '-12-31';
+  const trendEnd = yearEnd > today ? today : yearEnd;
 
-  // 세 창(선택 기간·직전 기간·추이) 중 가장 이른 날부터 한 번에 받는다.
+  // 세 창(선택 기간·직전 기간·연간 표) 중 가장 이른 날부터 한 번에 받는다.
   const fetchFrom = [prevFrom, trendFrom, from].sort()[0];
+  const fetchTo = [to, trendEnd].sort().pop();
 
   $('out').innerHTML = '<p class="none">집계하는 중...</p>';
   try {
+    // 전체 기록 중 가장 이른 날. 그보다 앞선 달을 0% 로 그리면 "장비를 놀렸다"로
+    // 읽히는데 실제로는 예약 제도를 쓰기 전이라 잴 수 없던 기간이다.
+    let firstDate = null;
+    try {
+      const f = await pb.collection(CONFIG.collection).getList(1, 1, { sort: 'date' });
+      if (f.items.length) firstDate = f.items[0].date;
+    } catch (e) { /* 못 구하면 구분 없이 그린다 */ }
+
     const list = await pb.collection(CONFIG.collection).getFullList({
-      filter: pb.filter('date >= {:f} && date <= {:t}', { f: fetchFrom, t: to }),
+      filter: pb.filter('date >= {:f} && date <= {:t}', { f: fetchFrom, t: fetchTo }),
       sort: 'date,hour',
     });
     const mine = list.filter(r => machines.includes(r.machine));
-    const cur = mine.filter(r => r.date >= from);
+    const cur = mine.filter(r => r.date >= from && r.date <= to);
     const prev = mine.filter(r => r.date >= prevFrom && r.date <= prevTo);
 
     const a = analyze(cur, machines, from, to, basis);
     const p = analyze(prev, machines, prevFrom, prevTo, basis);
-    a.trend = buildTrend(mine, machines, basis, trendFrom, trendEnd);
-    a.trendFrom = trendFrom; a.trendTo = trendEnd;
+    a.trend = buildTrend(mine, machines, basis, trendFrom, trendEnd, firstDate);
+    a.trendYear = year; a.trendFrom = trendFrom; a.trendTo = trendEnd;
     // 앞 기간에 아무 기록이 없으면 "0% 였다가 늘었다"가 아니라 "비교할 게 없다"가 맞다.
     // 서비스를 막 시작한 시점에 증감을 붙이면 의미 없는 숫자가 된다.
     a.prevUtil = p.used > 0 ? p.util : null;
@@ -789,15 +817,18 @@ function toCsv(a) {
   L.push([q('평균 사용시간(건당)'), q(Math.round(a.avgSession * 10) / 10)].join(','));
   L.push([q('이용자 수'), q(a.users)].join(','));
   L.push([q('사전예약 중앙값(일)'), q(a.leadMed == null ? '' : a.leadMed)].join(','));
-  if (a.trend.length > 1) {
+  if (a.trend.length) {
     L.push('');
+    L.push([q(a.trendYear + '년 월별')].join(','));
     L.push([q('월'), q('사용시간'), q('가용시간'), q('가동률'), q('전월대비(%p)'), q('비고')].join(','));
-    a.trend.forEach((m, i) => {
-      const prev = i > 0 ? a.trend[i - 1].util : null;
-      const d = prev == null ? '' : Math.round((m.util - prev) * 1000) / 10;
-      L.push([q(m.ym), q(m.used), q(m.capacity), q(pct(m.util)), q(d),
-              q(m.partial ? '일부 기간 (' + m.from + '~' + m.to + ')' : '')].join(','));
-    });
+    let pu = null;
+    for (const m of a.trend) {
+      if (m.noData) { L.push([q(m.month + '월'), q(''), q(''), q(''), q(''), q('기록 없음')].join(',')); continue; }
+      const d = pu == null ? '' : Math.round((m.util - pu) * 1000) / 10;
+      pu = m.util;
+      L.push([q(m.month + '월'), q(m.used), q(m.capacity), q(pct(m.util)), q(d),
+              q(m.ongoing ? '진행 중 (~' + m.to + ')' : '')].join(','));
+    }
   }
   L.push('');
   L.push([q('자원'), q('사용시간'), q('가동률')].join(','));
