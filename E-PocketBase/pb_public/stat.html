@@ -420,25 +420,6 @@ function analyze(records, machines, from, to, basis) {
   const peakMax = Math.max(0, ...byHour.map(x => x.hours));
   const peaks = peakMax > 0 ? byHour.filter(x => x.hours === peakMax) : [];
 
-  // 월별 추이. 한 시점의 34% 보다 28% -> 31% -> 34% 가 훨씬 많은 것을 말해준다.
-  // 가용시간도 달마다 다시 세므로(달마다 평일 수가 다르다) 달끼리 바로 비교된다.
-  const trend = monthsIn(from, to)
-    .map(mo => {
-      const mEff = mo.to > today ? today : mo.to;
-      if (mEff < mo.from) return null;                 // 아직 시작도 안 한 달은 줄을 만들지 않는다
-      const md = daysIn(mo.from, mEff, basis);
-      const mset = new Set(md);
-      const mu = records.filter(r => mset.has(r.date)).length;
-      const mcap = md.length * HPD * machines.length;
-      return {
-        ym: mo.ym, partial: mo.partial, from: mo.from, to: mEff,
-        ongoing: mo.to > today,                        // 아직 안 끝난 달
-        days: md.length, used: mu, capacity: mcap, util: mcap ? mu / mcap : 0,
-        future: records.filter(r => r.date > mEff && r.date <= mo.to).length,
-      };
-    })
-    .filter(Boolean);
-
   return {
     from, to, basis, machines, days: days.length, HPD,
     effTo, ongoing, notYet, futureHours,
@@ -448,11 +429,54 @@ function analyze(records, machines, from, to, basis) {
     avgSession: bookings.length ? used / bookings.length : 0,
     users: byUser.length,
     dailyAvg: days.length ? used / days.length : 0,
-    byMachine, byUser, byDept, byHour, byDow, trend,
+    byMachine, byUser, byDept, byHour, byDow,
+    trend: [],            // 월별 추이는 선택 기간과 별개 창이라 run() 에서 채운다
     topN, topShare, peaks, peakMax,
     leadAvg: leads.length ? leads.reduce((a, b) => a + b, 0) / leads.length : null,
     leadMed: median(leads),
   };
+}
+
+/* 월별 가동률 추이.
+ *
+ * 선택한 기간과 별개의 창을 쓴다. 기간에 묶어 두면 기본값인 '이번 달'에서는
+ * 한 줄짜리 표가 되어 비교가 되지 않고, 그러면 추이를 보려고 기간을 일부러
+ * 늘려야 한다. 추이는 늘 보여야 하는 정보라 따로 낸다.
+ *
+ * 가용시간을 달마다 다시 세는 것이 핵심이다. 달에 따라 평일이 20일이었다가
+ * 23일이 되므로, 사용시간만 비교하면 짧은 달이 부당하게 낮아 보인다.
+ */
+function buildTrend(records, machines, basis, tFrom, tTo) {
+  const HPD = CONFIG.endHour - CONFIG.startHour;
+  const today = todayStr();
+  return monthsIn(tFrom, tTo)
+    .map(mo => {
+      const mEff = mo.to > today ? today : mo.to;
+      if (mEff < mo.from) return null;                 // 아직 시작도 안 한 달은 줄을 만들지 않는다
+
+      // '진행 중'인지는 달력상 그 달의 마지막 날로 판단한다. mo.to 는 조회 창에
+      // 맞춰 이미 잘려 있어서, 창 끝이 오늘이면 이번 달까지 '끝난 달'로 보게 된다.
+      const [yy, mm] = mo.ym.split('-').map(Number);
+      const monthEnd = fmtYmd(new Date(yy, mm, 0));
+
+      const md = daysIn(mo.from, mEff, basis);
+      const mset = new Set(md);
+      const mu = records.filter(r => mset.has(r.date)).length;
+      const mcap = md.length * HPD * machines.length;
+      return {
+        ym: mo.ym, partial: mo.partial, from: mo.from, to: mEff,
+        ongoing: monthEnd > today,                     // 아직 안 끝난 달
+        days: md.length, used: mu, capacity: mcap, util: mcap ? mu / mcap : 0,
+        // 앞으로 잡힌 예약은 그 달 끝까지 센다. 조회 창이 오늘까지여도
+        // 이달 남은 날에 잡힌 예약은 알려줘야 한다.
+        future: records.filter(r => r.date > mEff && r.date <= monthEnd).length,
+      };
+    })
+    .filter(Boolean)
+    // 기록이 시작되기 전의 달은 떼어낸다. 예약 제도를 쓰기 전 달까지 0% 로 그리면
+    // "장비를 놀렸다"로 읽히는데, 실제로는 집계할 기록 자체가 없던 기간이다.
+    // 뒤쪽의 0% 는 남긴다. 쓰다가 안 쓰게 된 것은 실제 정보다.
+    .reduce((acc, m) => (acc.length || m.used > 0 ? (acc.push(m), acc) : acc), []);
 }
 
 /* 가동률 해석. 설비·시설 운영에서 흔히 쓰는 구간이다.
@@ -517,7 +541,8 @@ function render(a) {
   if (a.trend.length > 1) {
     const maxU = Math.max(0.0001, ...a.trend.map(x => x.util));
     h += '<div class="sec"><h2>월별 가동률 추이</h2>'
-      + '<p class="desc">달마다 평일 수가 다르므로 가용시간도 달마다 다시 셉니다. 그래서 달끼리 바로 비교됩니다. '
+      + '<p class="desc">위 기간과 별개로 <b>최근 6개월</b>을 봅니다(' + a.trendFrom + ' ~ ' + a.trendTo + '). '
+      + '달마다 평일 수가 다르므로 가용시간도 달마다 다시 셉니다. 그래서 달끼리 바로 비교됩니다. '
       + '아직 안 끝난 달은 <b>오늘까지</b>만 계산합니다 — 남은 날을 가용시간에 넣으면 그 달만 낮게 나와 비교가 망가집니다. '
       + '가동률은 비율이라 15일치와 30일치를 그대로 견줄 수 있습니다. '
       + '증감은 %p(퍼센트포인트)입니다 — 30%에서 33%가 되면 3%p 늘어난 것입니다.</p>'
@@ -671,18 +696,30 @@ async function run() {
   const prevTo = dateAdd(from, -1);
   const prevFrom = dateAdd(prevTo, -(span - 1));
 
+  // 월별 추이 창 — 선택 기간이 짧아도 최소 6개월은 보여준다.
+  // 기간에 묶으면 '이번 달'에서는 한 줄뿐이라 추이가 안 보인다.
+  const trendEnd = effTo < from ? to : effTo;
+  const te = parseDate(trendEnd);
+  const trendFromCand = fmtYmd(new Date(te.getFullYear(), te.getMonth() - 5, 1));
+  const trendFrom = trendFromCand < from ? trendFromCand : from;
+
+  // 세 창(선택 기간·직전 기간·추이) 중 가장 이른 날부터 한 번에 받는다.
+  const fetchFrom = [prevFrom, trendFrom, from].sort()[0];
+
   $('out').innerHTML = '<p class="none">집계하는 중...</p>';
   try {
     const list = await pb.collection(CONFIG.collection).getFullList({
-      filter: pb.filter('date >= {:f} && date <= {:t}', { f: prevFrom, t: to }),
+      filter: pb.filter('date >= {:f} && date <= {:t}', { f: fetchFrom, t: to }),
       sort: 'date,hour',
     });
     const mine = list.filter(r => machines.includes(r.machine));
     const cur = mine.filter(r => r.date >= from);
-    const prev = mine.filter(r => r.date < from);
+    const prev = mine.filter(r => r.date >= prevFrom && r.date <= prevTo);
 
     const a = analyze(cur, machines, from, to, basis);
     const p = analyze(prev, machines, prevFrom, prevTo, basis);
+    a.trend = buildTrend(mine, machines, basis, trendFrom, trendEnd);
+    a.trendFrom = trendFrom; a.trendTo = trendEnd;
     // 앞 기간에 아무 기록이 없으면 "0% 였다가 늘었다"가 아니라 "비교할 게 없다"가 맞다.
     // 서비스를 막 시작한 시점에 증감을 붙이면 의미 없는 숫자가 된다.
     a.prevUtil = p.used > 0 ? p.util : null;
