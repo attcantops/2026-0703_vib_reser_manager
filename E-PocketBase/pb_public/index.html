@@ -215,6 +215,8 @@
     <div class="nav">
       <a id="navMine"><span class="ico">▤</span>나의 예약 목록</a>
       <div id="navResList"></div>
+      <!-- 통계는 관리자 전용이라 별도 페이지다. 예약 화면은 그대로 가볍게 둔다. -->
+      <a href="stat.html" id="navStat"><span class="ico">◪</span>통계</a>
     </div>
     <div class="me-box" id="meBox"></div>
     <!-- 화면 버전. update.sh 가 배포할 때 커밋 번호로 채운다.
@@ -334,32 +336,11 @@
 <!-- PocketBase JS SDK (UMD) -->
 <!-- SDK는 같은 서버에서 서빙한다. 인터넷이 막힌 사내망/폐쇄망에서도 동작해야 하므로
      CDN(jsdelivr 등)을 쓰지 않는다. 갱신은 lib/pocketbase.umd.js 파일 교체로 한다. -->
+<!-- 자원 목록·운영시간. 통계 화면(stat.html)과 함께 쓰므로 별도 파일로 뺐다.
+     두 곳에 따로 두면 한쪽에만 자원을 추가하는 사고가 난다. -->
+<script src="lib/config.js"></script>
 <script src="lib/pocketbase.umd.js"></script>
 <script>
-/* ============================================================
-   설정
-   ============================================================ */
-const CONFIG = {
-  // 자원 목록. 이 배열 하나가 사이드바·일간 화면의 열·예약창의 자원 선택·목록의
-  // 분류 칸을 모두 결정한다. 자원을 늘리려면 여기에 한 줄 추가하면 된다.
-  //
-  // group 은 화면을 나누는 단위다. 일간 화면은 "한 분류의 자원들"을 열로 놓는다.
-  // 분류를 섞어 늘어놓으면 열이 계속 늘어나 비교가 안 되기 때문이다.
-  //
-  // ※ name 은 예약 기록에 그대로 저장된다. 이미 예약이 있는 자원의 이름을 바꾸면
-  //   기존 예약이 어느 열에도 안 잡혀 사라진 것처럼 보인다. 바꿀 때는 기록도 함께 옮겨야 한다.
-  resources: [
-    { group: '시험기',  name: '진동시험기 1호' },
-    { group: '시험기',  name: '진동시험기 2호' },
-    { group: 'TestBed', name: 'TestBed 1호' },
-    { group: 'TestBed', name: 'TestBed 2호' },
-  ],
-  startHour: 8,     // 예약 가능 시작
-  endHour: 20,      // 예약 가능 시각은 8..19 (endHour 미만)
-  maxHours: 8,      // 연속 최대
-  collection: 'reservations',
-};
-
 const pb = new PocketBase(window.location.origin);
 
 /* ============================================================
@@ -380,21 +361,7 @@ function isMine(rec) { return meReady() && rec.name === me.name && (rec.dept || 
 /* ============================================================
    상태
    ============================================================ */
-/* 자원 목록 조회 helper — CONFIG.resources 를 여기저기서 직접 훑지 않도록 모아둔다 */
-function groupNames() {
-  const seen = [];
-  for (const r of CONFIG.resources) if (!seen.includes(r.group)) seen.push(r.group);
-  return seen;
-}
-function machinesOf(group) {
-  return CONFIG.resources.filter(r => r.group === group).map(r => r.name);
-}
-function groupOf(machine) {
-  const r = CONFIG.resources.find(x => x.name === machine);
-  return r ? r.group : CONFIG.resources[0].group;
-}
-function allMachines() { return CONFIG.resources.map(r => r.name); }
-
+/* groupNames() · machinesOf() · groupOf() · allMachines() 는 lib/config.js 에 있다 */
 let currentGroup = CONFIG.resources[0].group;
 let currentMachine = CONFIG.resources[0].name;
 let view = 'res';               // 'res' | 'mine'

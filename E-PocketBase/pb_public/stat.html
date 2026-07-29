@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>진동시험기 예약 — 통계</title>
+<style>
+  :root {
+    --line: #d0d7de;
+    --line-soft: #e6eaef;
+    --head-bg: #f6f8fa;
+    --primary: #1a73c7;
+    --primary-dark: #145ea3;
+    --bar: #8fadc9;
+    --bar-hot: #d98383;
+    --text: #24292f;
+    --muted: #6b7280;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", "맑은 고딕", sans-serif;
+    background: #fff; color: var(--text); line-height: 1.5; font-size: 14px;
+  }
+  button, input, select { font-family: inherit; }
+  button { cursor: pointer; }
+  code { background: #f3f5f7; padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 24px 22px 60px; }
+
+  .top {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; margin-bottom: 22px;
+    padding-bottom: 16px; border-bottom: 1px solid var(--line-soft);
+  }
+  .top h1 { font-size: 19px; margin: 0; font-weight: 700; }
+  .top .who { font-size: 12px; color: var(--muted); }
+  .top a, .top button {
+    font-size: 13px; color: #374151; background: #fff; text-decoration: none;
+    border: 1px solid var(--line); border-radius: 6px; padding: 6px 13px; display: inline-block;
+  }
+  .top a:hover, .top button:hover { background: #f3f5f7; }
+
+  /* ---------- 잠금 화면 ---------- */
+  .locked { max-width: 420px; margin: 70px auto; text-align: center; color: var(--muted); }
+  .locked .lk { font-size: 40px; margin-bottom: 14px; opacity: .55; }
+  .locked h2 { color: var(--text); font-size: 17px; margin: 0 0 10px; }
+  .locked p { font-size: 13px; line-height: 1.75; margin: 0 0 20px; }
+  .lform { display: grid; grid-template-columns: 74px 1fr; gap: 10px; text-align: left; margin-bottom: 16px; }
+  .lform label { font-size: 13px; color: #57606a; align-self: center; }
+  .lform input { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font-size: 14px; }
+  .locked .go { background: var(--primary); color: #fff; border: 0; border-radius: 6px; padding: 10px 24px; font-size: 14px; font-weight: 700; width: 100%; }
+  .locked .go:hover { background: var(--primary-dark); }
+  .err { display: none; background: #fdeeee; color: #a5222b; font-size: 13px; padding: 9px 12px; border-radius: 6px; margin-bottom: 14px; text-align: left; }
+  .err.on { display: block; }
+
+  /* ---------- 조회 조건 ---------- */
+  .bar {
+    display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap;
+    padding: 14px 16px; background: #f8fafc;
+    border: 1px solid var(--line-soft); border-radius: 8px; margin-bottom: 12px;
+  }
+  .bar .fld { display: flex; flex-direction: column; gap: 5px; }
+  .bar label { font-size: 11px; color: var(--muted); font-weight: 700; }
+  .bar input, .bar select {
+    border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px;
+    font-size: 13px; background: #fff; color: var(--text);
+  }
+  .bar .go { background: var(--primary); color: #fff; border: 0; border-radius: 6px; padding: 9px 20px; font-size: 13px; font-weight: 700; }
+  .bar .go:hover { background: var(--primary-dark); }
+  .bar .sub { background: #5b7083; color: #fff; border: 0; border-radius: 6px; padding: 9px 16px; font-size: 13px; font-weight: 700; }
+  .quick { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 24px; }
+  .quick button { background: #fff; border: 1px solid var(--line); border-radius: 15px; padding: 5px 13px; font-size: 12px; color: #374151; }
+  .quick button:hover { background: #f3f5f7; }
+
+  /* ---------- 요약 타일 ---------- */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .tile { border: 1px solid var(--line-soft); border-radius: 8px; padding: 14px 16px; }
+  .tile .k { font-size: 12px; color: var(--muted); margin-bottom: 7px; }
+  .tile .v { font-size: 24px; font-weight: 700; line-height: 1.15; }
+  .tile .s { font-size: 12px; color: var(--muted); margin-top: 5px; }
+  .tile.hi { background: #eaf2fb; border-color: #cfe0f0; }
+  .tile.hi .v { color: var(--primary); }
+  .judge { font-size: 13px; color: var(--muted); margin: 0 0 30px; padding: 11px 14px; background: #f8fafc; border-radius: 6px; }
+  .judge b { color: var(--text); }
+
+  /* ---------- 섹션 ---------- */
+  .sec { margin-bottom: 34px; }
+  .sec h2 { font-size: 15px; font-weight: 700; margin: 0 0 4px; }
+  .sec .desc { font-size: 12px; color: var(--muted); margin: 0 0 12px; line-height: 1.6; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    background: var(--head-bg); font-size: 12px; color: #57606a; font-weight: 700;
+    text-align: left; padding: 9px 12px; white-space: nowrap;
+    border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--line-soft); }
+  td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  tbody tr:hover td { background: #fafbfc; }
+  .barcell { width: 38%; min-width: 110px; }
+  .b { background: #eef2f6; border-radius: 3px; height: 9px; overflow: hidden; }
+  .b > i { display: block; height: 100%; background: var(--bar); }
+  .b > i.hot { background: var(--bar-hot); }
+  .none { text-align: center; color: var(--muted); padding: 26px 12px; }
+
+  /* ---------- 시간대 분포 ---------- */
+  .cols { display: flex; align-items: flex-end; gap: 5px; height: 150px; padding-top: 8px; overflow-x: auto; }
+  .cb { flex: 1 1 0; min-width: 26px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px; }
+  .cb .c { width: 100%; background: var(--bar); border-radius: 3px 3px 0 0; min-height: 2px; }
+  .cb .c.hot { background: var(--bar-hot); }
+  .cb .l { font-size: 10px; color: var(--muted); white-space: nowrap; }
+  .cb .n { font-size: 10px; color: #57606a; font-weight: 700; }
+
+  .foot { font-size: 12px; color: var(--muted); line-height: 1.9; border-top: 1px solid var(--line-soft); padding-top: 16px; margin-top: 40px; }
+  .foot b { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 로그인 전 -->
+  <div class="locked" id="locked">
+    <div class="lk">▤</div>
+    <h2>통계 — 관리자 전용</h2>
+    <p>PocketBase 관리자 계정으로 로그인하세요.<br>
+       관리자 화면(<code>/_/</code>)에 쓰는 계정과 같습니다.</p>
+    <div class="err" id="loginErr"></div>
+    <div class="lform">
+      <label for="email">이메일</label>
+      <input type="email" id="email" autocomplete="username">
+      <label for="pw">비밀번호</label>
+      <input type="password" id="pw" autocomplete="current-password">
+    </div>
+    <button type="button" class="go" id="doLogin">로그인</button>
+    <p style="margin-top:18px"><a href="./" style="color:var(--muted)">← 예약 화면으로</a></p>
+  </div>
+
+  <!-- 로그인 후 -->
+  <div id="body" style="display:none;">
+    <div class="top">
+      <h1>진동시험기 예약 — 통계</h1>
+      <div>
+        <span class="who" id="who"></span>
+        <a href="./">예약 화면</a>
+        <button type="button" id="doLogout">로그아웃</button>
+      </div>
+    </div>
+
+    <div class="bar">
+      <div class="fld"><label for="from">시작일</label><input type="date" id="from"></div>
+      <div class="fld"><label for="to">종료일</label><input type="date" id="to"></div>
+      <div class="fld"><label for="grp">분류</label><select id="grp"></select></div>
+      <div class="fld">
+        <label for="basis">가용시간 기준</label>
+        <select id="basis">
+          <option value="weekday">평일만 (월~금)</option>
+          <option value="all">전체 요일</option>
+        </select>
+      </div>
+      <button type="button" class="go" id="go">조회</button>
+      <button type="button" class="sub" id="csv">CSV</button>
+    </div>
+    <div class="quick">
+      <button type="button" data-q="thismonth">이번 달</button>
+      <button type="button" data-q="lastmonth">지난 달</button>
+      <button type="button" data-q="d30">최근 30일</button>
+      <button type="button" data-q="d90">최근 90일</button>
+      <button type="button" data-q="year">올해</button>
+    </div>
+
+    <div id="out"></div>
+
+    <div class="foot" id="foot"></div>
+  </div>
+</div>
+
+<script src="lib/config.js"></script>
+<script src="lib/pocketbase.umd.js"></script>
+<script>
+const pb = new PocketBase(window.location.origin);
+const $ = (id) => document.getElementById(id);
+
+/* ============================================================
+   유틸
+   ============================================================ */
+function pad2(n) { return String(n).padStart(2, '0'); }
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function fmtYmd(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+function parseDate(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+function dateAdd(s, n) { const d = parseDate(s); d.setDate(d.getDate() + n); return fmtYmd(d); }
+function todayStr() { return fmtYmd(new Date()); }
+const DOW = ['일', '월', '화', '수', '목', '금', '토'];
+
+function ampm(h) {
+  if (h === 0) return '오전 12시';
+  if (h < 12) return '오전 ' + h + '시';
+  if (h === 12) return '오후 12시';
+  return '오후 ' + (h - 12) + '시';
+}
+/* 소수 첫째 자리까지. 정수면 정수로 (34.0% 보다 34% 가 읽기 편하다) */
+function pct(x) {
+  if (!isFinite(x)) return '-';
+  const v = Math.round(x * 1000) / 10;
+  return (v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)) + '%';
+}
+function num(n) { return n.toLocaleString('ko-KR'); }
+function hrs(n) { return num(Math.round(n * 10) / 10) + '시간'; }
+
+/* ============================================================
+   관리자 인증 — PocketBase superuser 계정을 그대로 쓴다.
+   ※ 이건 화면을 가리는 것이지 데이터를 잠그는 게 아니다. 예약 목록 자체는
+     예약 화면이 읽어야 하므로 공개돼 있고, 통계는 그 데이터를 가공한 것뿐이다.
+     API 를 직접 두드리는 사람까지 막으려면 컬렉션 규칙부터 다시 설계해야 한다.
+   ============================================================ */
+function isAdmin() {
+  if (!pb.authStore.isValid) return false;
+  if (pb.authStore.isSuperuser === true) return true;   // SDK 0.23+
+  const rec = pb.authStore.record || pb.authStore.model;
+  return !!rec && rec.collectionName === '_superusers';
+}
+
+function showLogin(msg) {
+  $('locked').style.display = '';
+  $('body').style.display = 'none';
+  const e = $('loginErr');
+  if (msg) { e.textContent = msg; e.className = 'err on'; } else { e.className = 'err'; }
+}
+
+function showBody() {
+  $('locked').style.display = 'none';
+  $('body').style.display = '';
+  const rec = pb.authStore.record || pb.authStore.model;
+  $('who').textContent = (rec && rec.email ? rec.email : '관리자') + ' · ';
+}
+
+async function doLogin() {
+  const email = $('email').value.trim();
+  const pw = $('pw').value;
+  if (!email || !pw) return showLogin('이메일과 비밀번호를 입력하세요.');
+  const btn = $('doLogin');
+  btn.disabled = true; btn.textContent = '확인 중...';
+  try {
+    await pb.collection('_superusers').authWithPassword(email, pw);
+    $('pw').value = '';
+    showBody();
+    setQuick('thismonth');
+    await run();
+  } catch (err) {
+    // 비밀번호가 틀렸는지 계정이 없는지는 구분해서 알려주지 않는다(계정 존재 여부 노출).
+    showLogin('로그인하지 못했습니다. 이메일과 비밀번호를 확인하세요.');
+  } finally {
+    btn.disabled = false; btn.textContent = '로그인';
+  }
+}
+
+/* ============================================================
+   집계
+   ============================================================ */
+
+/* 기간 안의 날짜를 훑는다. 기준이 '평일만'이면 토·일은 건너뛴다. */
+function daysIn(from, to, basis) {
+  const out = [];
+  let d = from;
+  let guard = 0;
+  while (d <= to && guard++ < 4000) {
+    const w = parseDate(d).getDay();
+    if (basis === 'all' || (w !== 0 && w !== 6)) out.push(d);
+    d = dateAdd(d, 1);
+  }
+  return out;
+}
+
+/* 같은 자원·날짜·예약자의 연속 시간을 한 건으로 묶는다.
+   "예약 건수"와 "평균 사용 시간"은 1시간 단위 레코드가 아니라 이 묶음이 기준이다. */
+function toBookings(list) {
+  const sorted = list.slice().sort((a, b) =>
+    (a.machine || '').localeCompare(b.machine || '') ||
+    (a.date || '').localeCompare(b.date || '') ||
+    Number(a.hour) - Number(b.hour));
+  const out = [];
+  for (const r of sorted) {
+    const last = out[out.length - 1];
+    if (last && last.machine === r.machine && last.date === r.date
+        && last.name === r.name && (last.dept || '') === (r.dept || '')
+        && Number(r.hour) === last.endHour) {
+      last.endHour = Number(r.hour) + 1;
+    } else {
+      out.push({
+        machine: r.machine, date: r.date, name: r.name, dept: r.dept || '',
+        created: r.created, startHour: Number(r.hour), endHour: Number(r.hour) + 1,
+      });
+    }
+  }
+  return out;
+}
+
+/* 예약을 며칠 전에 잡았나 (사전 예약 리드타임).
+   수요가 몰릴수록 미리 잡는다. 설비 증설 판단에 쓰는 표준 지표다. */
+function leadDays(b) {
+  if (!b.created) return null;
+  const c = new Date(String(b.created).replace(' ', 'T'));
+  if (isNaN(c)) return null;
+  const use = parseDate(b.date);
+  const cd = new Date(c.getFullYear(), c.getMonth(), c.getDate());
+  return Math.round((use - cd) / 86400000);
+}
+
+function median(arr) {
+  if (!arr.length) return null;
+  const a = arr.slice().sort((x, y) => x - y);
+  const m = Math.floor(a.length / 2);
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+}
+
+function analyze(records, machines, from, to, basis) {
+  const HPD = CONFIG.endHour - CONFIG.startHour;      // 하루 운영시간
+  const days = daysIn(from, to, basis);
+  const dayset = new Set(days);
+
+  // 기준과 어긋나는 기록은 집계에서 뺀다. 평일 기준인데 주말 사용을 더하면
+  // 가동률이 100% 를 넘어 숫자가 말이 안 된다. 대신 몇 시간이 빠졌는지는 알려준다.
+  const inScope = records.filter(r => dayset.has(r.date));
+  const excluded = records.length - inScope.length;
+
+  const capacityPer = days.length * HPD;
+  const capacity = capacityPer * machines.length;
+  const used = inScope.length;                         // 1건 = 1시간
+
+  const bookings = toBookings(inScope);
+
+  // 자원별
+  const byMachine = machines.map(m => {
+    const h = inScope.filter(r => r.machine === m).length;
+    return { name: m, hours: h, util: capacityPer ? h / capacityPer : 0 };
+  }).sort((a, b) => b.hours - a.hours);
+
+  // 예약자별 (이름+부서가 같아야 같은 사람 — 동명이인 때문에)
+  const uMap = new Map();
+  for (const r of inScope) {
+    const k = r.name + '|' + (r.dept || '');
+    const v = uMap.get(k) || { name: r.name, dept: r.dept || '', hours: 0, count: 0 };
+    v.hours++; uMap.set(k, v);
+  }
+  for (const b of bookings) {
+    const k = b.name + '|' + b.dept;
+    if (uMap.has(k)) uMap.get(k).count++;
+  }
+  const byUser = [...uMap.values()].sort((a, b) => b.hours - a.hours);
+
+  // 부서별
+  const dMap = new Map();
+  for (const r of inScope) {
+    const k = r.dept || '(미기재)';
+    dMap.set(k, (dMap.get(k) || 0) + 1);
+  }
+  const byDept = [...dMap.entries()].map(([name, hours]) => ({ name, hours }))
+    .sort((a, b) => b.hours - a.hours);
+
+  // 시간대별 / 요일별
+  const byHour = [];
+  for (let h = CONFIG.startHour; h < CONFIG.endHour; h++) {
+    byHour.push({ hour: h, hours: inScope.filter(r => Number(r.hour) === h).length });
+  }
+  const byDow = DOW.map((d, i) => ({
+    dow: d, idx: i,
+    hours: inScope.filter(r => parseDate(r.date).getDay() === i).length,
+    days: days.filter(x => parseDate(x).getDay() === i).length,
+  })).filter(x => basis === 'all' || (x.idx !== 0 && x.idx !== 6));
+
+  // 상위 집중도 (파레토) — 상위 20% 이용자가 몇 % 를 쓰는가
+  const topN = Math.max(1, Math.ceil(byUser.length * 0.2));
+  const topShare = used ? byUser.slice(0, topN).reduce((s, u) => s + u.hours, 0) / used : 0;
+
+  const leads = bookings.map(leadDays).filter(x => x != null && x >= 0);
+  const peak = byHour.reduce((a, b) => (b.hours > a.hours ? b : a), byHour[0] || { hour: 0, hours: 0 });
+
+  return {
+    from, to, basis, machines, days: days.length, HPD,
+    capacity, capacityPer, used, excluded,
+    util: capacity ? used / capacity : 0,
+    bookings: bookings.length,
+    avgSession: bookings.length ? used / bookings.length : 0,
+    users: byUser.length,
+    dailyAvg: days.length ? used / days.length : 0,
+    byMachine, byUser, byDept, byHour, byDow,
+    topN, topShare, peak,
+    leadAvg: leads.length ? leads.reduce((a, b) => a + b, 0) / leads.length : null,
+    leadMed: median(leads),
+  };
+}
+
+/* 가동률 해석. 설비·시설 운영에서 흔히 쓰는 구간이다.
+   숫자만 던지면 "34%가 높은 건가 낮은 건가"에서 대화가 멈춘다. */
+function judge(u) {
+  if (u >= 0.85) return { t: '포화', d: '대기가 생기고 원하는 시간을 못 잡는 상태입니다. 증설을 검토할 구간입니다.' };
+  if (u >= 0.70) return { t: '높음', d: '여유가 거의 없습니다. 수요가 더 늘면 곧 포화됩니다.' };
+  if (u >= 0.30) return { t: '정상', d: '일반적인 공용 설비의 운영 구간입니다.' };
+  if (u > 0)     return { t: '낮음', d: '설비가 남습니다. 수요가 적거나, 예약 제도가 덜 알려졌을 수 있습니다.' };
+  return { t: '사용 없음', d: '이 기간에 예약이 없습니다.' };
+}
+
+/* ============================================================
+   그리기
+   ============================================================ */
+function barRow(label, hours, share, sub, hot) {
+  return '<tr>'
+    + '<td>' + esc(label) + (sub ? ' <span style="color:var(--muted);font-size:12px">' + esc(sub) + '</span>' : '') + '</td>'
+    + '<td class="num">' + hrs(hours) + '</td>'
+    + '<td class="barcell"><div class="b"><i class="' + (hot ? 'hot' : '')
+      + '" style="width:' + (Math.max(0, Math.min(1, share)) * 100).toFixed(1) + '%"></i></div></td>'
+    + '<td class="num">' + pct(share) + '</td>'
+    + '</tr>';
+}
+
+function render(a) {
+  const j = judge(a.util);
+  let h = '';
+
+  // ── 요약 ──
+  h += '<div class="tiles">'
+    + tile('가동률', pct(a.util), hrs(a.used) + ' / ' + hrs(a.capacity), true)
+    + tile('총 사용시간', hrs(a.used), '일평균 ' + hrs(a.dailyAvg))
+    + tile('예약 건수', num(a.bookings) + '건', '평균 ' + hrs(a.avgSession) + '/건')
+    + tile('이용자', num(a.users) + '명', a.users ? '1인 평균 ' + hrs(a.used / a.users) : '-')
+    + tile('가장 붐비는 시간', a.peak && a.peak.hours ? ampm(a.peak.hour) : '-', a.peak && a.peak.hours ? hrs(a.peak.hours) + ' 예약' : '')
+    + tile('사전 예약', a.leadMed != null ? a.leadMed + '일 전' : '-', a.leadAvg != null ? '평균 ' + (Math.round(a.leadAvg * 10) / 10) + '일' : '')
+    + '</div>';
+
+  h += '<p class="judge"><b>' + j.t + '</b> — ' + j.d
+    + ' 대상 ' + a.machines.length + '대 × ' + a.days + '일 × ' + a.HPD + '시간 = 가용 ' + hrs(a.capacity) + '.'
+    + (a.excluded ? ' <b>주말 ' + hrs(a.excluded) + '</b>은 평일 기준이라 제외했습니다.' : '')
+    + '</p>';
+
+  // ── 자원별 ──
+  h += '<div class="sec"><h2>자원별 가동량</h2>'
+    + '<p class="desc">자원 한 대의 가용시간은 ' + hrs(a.capacityPer) + '입니다. 가동률이 한쪽으로 쏠려 있으면 예약이 특정 장비로 몰린다는 뜻입니다.</p>'
+    + '<table><thead><tr><th>자원</th><th class="num">사용시간</th><th>가동률</th><th class="num">%</th></tr></thead><tbody>';
+  if (!a.byMachine.some(m => m.hours)) h += '<tr><td class="none" colspan="4">이 기간에 사용 기록이 없습니다.</td></tr>';
+  else for (const m of a.byMachine) h += barRow(m.name, m.hours, m.util, '', m.util >= 0.85);
+  h += '</tbody></table></div>';
+
+  // ── 예약자별 ──
+  h += '<div class="sec"><h2>예약자별 사용시간</h2>'
+    + '<p class="desc">이름과 부서가 모두 같아야 같은 사람으로 셉니다(동명이인 구분). '
+    + (a.users ? '상위 ' + a.topN + '명(전체의 20%)이 <b>' + pct(a.topShare) + '</b>를 사용했습니다.' : '')
+    + '</p>'
+    + '<table><thead><tr><th>이름</th><th class="num">사용시간</th><th>비중</th><th class="num">%</th><th class="num">예약 건수</th></tr></thead><tbody>';
+  if (!a.byUser.length) h += '<tr><td class="none" colspan="5">이 기간에 사용 기록이 없습니다.</td></tr>';
+  else for (const u of a.byUser) {
+    h += '<tr>'
+      + '<td>' + esc(u.name) + ' <span style="color:var(--muted);font-size:12px">' + esc(u.dept) + '</span></td>'
+      + '<td class="num">' + hrs(u.hours) + '</td>'
+      + '<td class="barcell"><div class="b"><i style="width:' + ((u.hours / a.used) * 100).toFixed(1) + '%"></i></div></td>'
+      + '<td class="num">' + pct(u.hours / a.used) + '</td>'
+      + '<td class="num">' + num(u.count) + '건</td>'
+      + '</tr>';
+  }
+  h += '</tbody></table></div>';
+
+  // ── 부서별 ──
+  h += '<div class="sec"><h2>부서별 사용시간</h2>'
+    + '<p class="desc">비용 배분이나 사용 실적 보고에 쓰는 구분입니다.</p>'
+    + '<table><thead><tr><th>부서</th><th class="num">사용시간</th><th>비중</th><th class="num">%</th></tr></thead><tbody>';
+  if (!a.byDept.length) h += '<tr><td class="none" colspan="4">이 기간에 사용 기록이 없습니다.</td></tr>';
+  else for (const d of a.byDept) h += barRow(d.name, d.hours, d.hours / a.used);
+  h += '</tbody></table></div>';
+
+  // ── 시간대별 ──
+  const maxH = Math.max(1, ...a.byHour.map(x => x.hours));
+  h += '<div class="sec"><h2>시간대별 분포</h2>'
+    + '<p class="desc">언제 몰리는지 봅니다. 특정 시간대만 꽉 차면 장비를 늘리기 전에 시간 분산을 먼저 검토할 수 있습니다.</p>'
+    + '<div class="cols">';
+  for (const x of a.byHour) {
+    const isPeak = x.hours === maxH && x.hours > 0;
+    h += '<div class="cb">'
+      + '<div class="n">' + (x.hours || '') + '</div>'
+      + '<div class="c ' + (isPeak ? 'hot' : '') + '" style="height:' + ((x.hours / maxH) * 100).toFixed(1) + '%"></div>'
+      + '<div class="l">' + x.hour + '</div></div>';
+  }
+  h += '</div></div>';
+
+  // ── 요일별 ──
+  const maxD = Math.max(1, ...a.byDow.map(x => x.hours));
+  h += '<div class="sec"><h2>요일별 분포</h2>'
+    + '<p class="desc">요일마다 날 수가 달라 시간 합만으로는 공평하지 않습니다. 하루당 평균으로 함께 봅니다.</p>'
+    + '<table><thead><tr><th>요일</th><th class="num">사용시간</th><th>비중</th><th class="num">하루평균</th></tr></thead><tbody>';
+  for (const x of a.byDow) {
+    h += '<tr><td>' + x.dow + '</td>'
+      + '<td class="num">' + hrs(x.hours) + '</td>'
+      + '<td class="barcell"><div class="b"><i style="width:' + ((x.hours / maxD) * 100).toFixed(1) + '%"></i></div></td>'
+      + '<td class="num">' + (x.days ? hrs(x.hours / x.days) : '-') + '</td></tr>';
+  }
+  h += '</tbody></table></div>';
+
+  $('out').innerHTML = h;
+
+  $('foot').innerHTML =
+      '<b>가동률</b> = 사용시간 ÷ 가용시간. 가용시간은 운영시간(' + CONFIG.startHour + '~' + CONFIG.endHour + '시, 하루 ' + a.HPD + '시간) 기준입니다.<br>'
+    + '<b>사전 예약</b> = 예약을 잡은 날부터 실제 사용일까지의 일수. 중앙값을 먼저 보는 편이 평균보다 실제에 가깝습니다.<br>'
+    + '<b>예약 건수</b>는 연속된 시간을 한 건으로 묶어 셉니다. 9~12시 예약은 3시간 1건입니다.<br>'
+    + '이 통계는 <b>예약 기록</b>만으로 계산합니다. 실제 가동 여부(예약하고 안 쓴 경우)나 고장 정지 시간은 기록이 없어 반영되지 않습니다.';
+}
+
+function tile(k, v, s, hi) {
+  return '<div class="tile' + (hi ? ' hi' : '') + '"><div class="k">' + esc(k) + '</div>'
+    + '<div class="v">' + esc(v) + '</div>'
+    + '<div class="s">' + esc(s || '') + '</div></div>';
+}
+
+/* ============================================================
+   조회
+   ============================================================ */
+let lastResult = null;
+
+async function run() {
+  const from = $('from').value, to = $('to').value;
+  if (!from || !to) return;
+  if (from > to) { $('out').innerHTML = '<p class="none">시작일이 종료일보다 늦습니다.</p>'; return; }
+
+  const group = $('grp').value;
+  const basis = $('basis').value;
+  const machines = machinesOf(group);
+
+  $('out').innerHTML = '<p class="none">집계하는 중...</p>';
+  try {
+    const list = await pb.collection(CONFIG.collection).getFullList({
+      filter: pb.filter('date >= {:f} && date <= {:t}', { f: from, t: to }),
+      sort: 'date,hour',
+    });
+    const mine = list.filter(r => machines.includes(r.machine));
+    lastResult = analyze(mine, machines, from, to, basis);
+    render(lastResult);
+  } catch (err) {
+    $('out').innerHTML = '<p class="none">불러오지 못했습니다: ' + esc(err && err.message ? err.message : String(err)) + '</p>';
+  }
+}
+
+/* 기간 빠른 선택 */
+function setQuick(q) {
+  const now = new Date();
+  let f, t;
+  if (q === 'thismonth') {
+    f = new Date(now.getFullYear(), now.getMonth(), 1);
+    t = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  } else if (q === 'lastmonth') {
+    f = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    t = new Date(now.getFullYear(), now.getMonth(), 0);
+  } else if (q === 'year') {
+    f = new Date(now.getFullYear(), 0, 1);
+    t = new Date(now.getFullYear(), 11, 31);
+  } else {
+    const n = q === 'd90' ? 89 : 29;
+    t = now; f = new Date(now.getFullYear(), now.getMonth(), now.getDate() - n);
+  }
+  $('from').value = fmtYmd(f);
+  $('to').value = fmtYmd(t);
+}
+
+/* ============================================================
+   CSV — 엑셀에서 한글이 깨지지 않도록 UTF-8 BOM 을 붙인다
+   ============================================================ */
+function toCsv(a) {
+  const q = s => '"' + String(s == null ? '' : s).replace(/"/g, '""') + '"';
+  const L = [];
+  L.push([q('기간'), q(a.from + ' ~ ' + a.to)].join(','));
+  L.push([q('분류'), q($('grp').value)].join(','));
+  L.push([q('가용시간 기준'), q(a.basis === 'weekday' ? '평일만' : '전체 요일')].join(','));
+  L.push([q('대상 자원'), q(a.machines.join(' / '))].join(','));
+  L.push('');
+  L.push([q('항목'), q('값')].join(','));
+  L.push([q('가용시간'), q(a.capacity)].join(','));
+  L.push([q('사용시간'), q(a.used)].join(','));
+  L.push([q('가동률'), q(pct(a.util))].join(','));
+  L.push([q('예약 건수'), q(a.bookings)].join(','));
+  L.push([q('평균 사용시간(건당)'), q(Math.round(a.avgSession * 10) / 10)].join(','));
+  L.push([q('이용자 수'), q(a.users)].join(','));
+  L.push([q('사전예약 중앙값(일)'), q(a.leadMed == null ? '' : a.leadMed)].join(','));
+  L.push('');
+  L.push([q('자원'), q('사용시간'), q('가동률')].join(','));
+  for (const m of a.byMachine) L.push([q(m.name), q(m.hours), q(pct(m.util))].join(','));
+  L.push('');
+  L.push([q('이름'), q('부서'), q('사용시간'), q('비중'), q('예약건수')].join(','));
+  for (const u of a.byUser) L.push([q(u.name), q(u.dept), q(u.hours), q(pct(u.hours / a.used)), q(u.count)].join(','));
+  L.push('');
+  L.push([q('부서'), q('사용시간'), q('비중')].join(','));
+  for (const d of a.byDept) L.push([q(d.name), q(d.hours), q(pct(d.hours / a.used))].join(','));
+  L.push('');
+  L.push([q('시각'), q('사용시간')].join(','));
+  for (const x of a.byHour) L.push([q(x.hour + '시'), q(x.hours)].join(','));
+  return L.join('\r\n');
+}
+
+function downloadCsv() {
+  if (!lastResult) return;
+  const blob = new Blob(['﻿' + toCsv(lastResult)], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '진동시험기_통계_' + lastResult.from + '_' + lastResult.to + '.csv';
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+}
+
+/* ============================================================
+   시작
+   ============================================================ */
+(function init() {
+  const g = $('grp');
+  groupNames().forEach(name => {
+    const o = document.createElement('option');
+    o.value = name; o.textContent = name;
+    g.appendChild(o);
+  });
+
+  $('doLogin').addEventListener('click', doLogin);
+  $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  $('email').addEventListener('keydown', e => { if (e.key === 'Enter') $('pw').focus(); });
+  $('doLogout').addEventListener('click', () => { pb.authStore.clear(); showLogin(); });
+
+  $('go').addEventListener('click', run);
+  $('csv').addEventListener('click', downloadCsv);
+  $('grp').addEventListener('change', run);
+  $('basis').addEventListener('change', run);
+  document.querySelectorAll('.quick button').forEach(b => {
+    b.addEventListener('click', () => { setQuick(b.dataset.q); run(); });
+  });
+
+  setQuick('thismonth');
+  if (isAdmin()) { showBody(); run(); } else { showLogin(); }
+})();
+</script>
+</body>
+</html>
