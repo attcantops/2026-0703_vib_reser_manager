@@ -165,7 +165,8 @@
       <button type="button" data-q="thismonth">이번 달</button>
       <button type="button" data-q="lastmonth">지난 달</button>
       <button type="button" data-q="d30">최근 30일</button>
-      <button type="button" data-q="d90">최근 90일</button>
+      <button type="button" data-q="m3">최근 3개월</button>
+      <button type="button" data-q="m6">최근 6개월</button>
       <button type="button" data-q="year">올해</button>
     </div>
 
@@ -551,22 +552,39 @@ async function run() {
   }
 }
 
-/* 기간 빠른 선택 */
+/* n개월 전 같은 날. 그 달에 그 날짜가 없으면(3/31 의 두 달 전 = 1/31 은 있지만
+   5/31 의 세 달 전 = 2/31 은 없다) 그 달의 마지막 날로 맞춘다.
+   그냥 setMonth 로 빼면 2/31 이 3/3 으로 넘어가 기간이 되레 짧아진다. */
+function monthsAgo(base, n) {
+  const y = base.getFullYear(), m = base.getMonth(), d = base.getDate();
+  const lastDay = new Date(y, m - n + 1, 0).getDate();
+  return new Date(y, m - n, Math.min(d, lastDay));
+}
+
+/* 기간 빠른 선택
+   이번 달·지난 달은 달력 기준, 최근 N일/N개월은 오늘 기준으로 뒤로 센다.
+   오늘이 달 중순이면 '최근 30일'이 두 달에 걸치므로 달력 기준과 겹치지 않는다. */
 function setQuick(q) {
   const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
   let f, t;
   if (q === 'thismonth') {
-    f = new Date(now.getFullYear(), now.getMonth(), 1);
-    t = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    f = new Date(y, m, 1);
+    t = new Date(y, m + 1, 0);
   } else if (q === 'lastmonth') {
-    f = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    t = new Date(now.getFullYear(), now.getMonth(), 0);
+    f = new Date(y, m - 1, 1);
+    t = new Date(y, m, 0);
   } else if (q === 'year') {
-    f = new Date(now.getFullYear(), 0, 1);
-    t = new Date(now.getFullYear(), 11, 31);
+    f = new Date(y, 0, 1);
+    t = new Date(y, 11, 31);
+  } else if (q === 'm3' || q === 'm6') {
+    // 오늘 포함 N개월. 3개월 전 같은 날의 '다음 날'부터라야 딱 N개월이 된다.
+    t = now;
+    f = monthsAgo(now, q === 'm6' ? 6 : 3);
+    f.setDate(f.getDate() + 1);
   } else {
-    const n = q === 'd90' ? 89 : 29;
-    t = now; f = new Date(now.getFullYear(), now.getMonth(), now.getDate() - n);
+    t = now;
+    f = new Date(y, m, now.getDate() - 29);   // 오늘 포함 30일
   }
   $('from').value = fmtYmd(f);
   $('to').value = fmtYmd(t);
