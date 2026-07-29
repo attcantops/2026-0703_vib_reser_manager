@@ -338,13 +338,31 @@ function median(arr) {
 
 function analyze(records, machines, from, to, basis) {
   const HPD = CONFIG.endHour - CONFIG.startHour;      // 하루 운영시간
-  const days = daysIn(from, to, basis);
+  const today = todayStr();
+
+  // 아직 오지 않은 날은 가용시간에서 뺀다.
+  //
+  // 오늘이 7/15 인데 '이번 달'(7/1~7/31)을 보면, 가용시간은 31일치인데 사용시간은
+  // 절반밖에 쌓이지 않아 가동률이 실제의 절반으로 나온다. 그 상태로 완료된 6월과
+  // 나란히 놓으면 7월이 부당하게 낮게 보인다.
+  //
+  // 오늘까지로 자르면 사용·가용이 같은 구간을 보게 되고, 가동률은 비율이라
+  // 15일치와 30일치를 그대로 비교할 수 있다.
+  const effTo = to > today ? today : to;
+  const ongoing = to > today;
+  const notYet = effTo < from;                         // 기간 전체가 아직 미래
+  const days = notYet ? [] : daysIn(from, effTo, basis);
   const dayset = new Set(days);
 
   // 기준과 어긋나는 기록은 집계에서 뺀다. 평일 기준인데 주말 사용을 더하면
   // 가동률이 100% 를 넘어 숫자가 말이 안 된다. 대신 몇 시간이 빠졌는지는 알려준다.
-  const inScope = records.filter(r => dayset.has(r.date));
-  const excluded = records.length - inScope.length;
+  const rangeRecs = records.filter(r => r.date >= from && r.date <= effTo);
+  const inScope = rangeRecs.filter(r => dayset.has(r.date));
+  const excluded = rangeRecs.length - inScope.length;
+
+  // 앞으로 잡혀 있는 예약. 실적이 아니라서 가동률에는 안 넣지만, 얼마나 차 있는지는
+  // 관리자가 알아야 하므로 따로 센다.
+  const futureHours = records.filter(r => r.date > effTo && r.date <= to).length;
 
   const capacityPer = days.length * HPD;
   const capacity = capacityPer * machines.length;
@@ -404,17 +422,26 @@ function analyze(records, machines, from, to, basis) {
 
   // 월별 추이. 한 시점의 34% 보다 28% -> 31% -> 34% 가 훨씬 많은 것을 말해준다.
   // 가용시간도 달마다 다시 세므로(달마다 평일 수가 다르다) 달끼리 바로 비교된다.
-  const trend = monthsIn(from, to).map(mo => {
-    const md = daysIn(mo.from, mo.to, basis);
-    const mset = new Set(md);
-    const mu = records.filter(r => mset.has(r.date)).length;
-    const mcap = md.length * HPD * machines.length;
-    return { ym: mo.ym, partial: mo.partial, from: mo.from, to: mo.to,
-             days: md.length, used: mu, capacity: mcap, util: mcap ? mu / mcap : 0 };
-  });
+  const trend = monthsIn(from, to)
+    .map(mo => {
+      const mEff = mo.to > today ? today : mo.to;
+      if (mEff < mo.from) return null;                 // 아직 시작도 안 한 달은 줄을 만들지 않는다
+      const md = daysIn(mo.from, mEff, basis);
+      const mset = new Set(md);
+      const mu = records.filter(r => mset.has(r.date)).length;
+      const mcap = md.length * HPD * machines.length;
+      return {
+        ym: mo.ym, partial: mo.partial, from: mo.from, to: mEff,
+        ongoing: mo.to > today,                        // 아직 안 끝난 달
+        days: md.length, used: mu, capacity: mcap, util: mcap ? mu / mcap : 0,
+        future: records.filter(r => r.date > mEff && r.date <= mo.to).length,
+      };
+    })
+    .filter(Boolean);
 
   return {
     from, to, basis, machines, days: days.length, HPD,
+    effTo, ongoing, notYet, futureHours,
     capacity, capacityPer, used, excluded,
     util: capacity ? used / capacity : 0,
     bookings: bookings.length,
@@ -452,6 +479,16 @@ function barRow(label, hours, share, sub, hot) {
 }
 
 function render(a) {
+  // 기간 전체가 아직 오지 않았으면 낼 실적이 없다. 0% 를 잔뜩 그리면
+  // "안 쓰고 있다"로 잘못 읽힌다.
+  if (a.notYet) {
+    $('out').innerHTML = '<p class="none">선택한 기간이 아직 시작되지 않았습니다 (오늘 ' + todayStr() + ').'
+      + (a.futureHours ? ' 이 기간에 잡혀 있는 예약은 ' + hrs(a.futureHours) + '입니다.' : ' 잡혀 있는 예약도 없습니다.')
+      + '</p>';
+    $('foot').innerHTML = '';
+    return;
+  }
+
   const j = judge(a.util);
   let h = '';
 
@@ -463,11 +500,16 @@ function render(a) {
     + tile('이용자', num(a.users) + '명', a.users ? '1인 평균 ' + hrs(a.used / a.users) : '-')
     + tile('가장 붐비는 시간', peakLabel(a.peaks), a.peakMax ? hrs(a.peakMax) + ' 예약' : '')
     + tile('사전 예약', a.leadMed != null ? a.leadMed + '일 전' : '-', a.leadAvg != null ? '평균 ' + (Math.round(a.leadAvg * 10) / 10) + '일' : '')
+    + (a.futureHours ? tile('앞으로 잡힌 예약', hrs(a.futureHours), '실적이 아니라 가동률에서 제외') : '')
     + '</div>';
 
   h += '<p class="judge"><b>' + j.t + '</b> — ' + j.d
     + ' 대상 ' + a.machines.length + '대 × ' + a.days + '일 × ' + a.HPD + '시간 = 가용 ' + hrs(a.capacity) + '.'
     + (a.excluded ? ' <b>주말 ' + hrs(a.excluded) + '</b>은 평일 기준이라 제외했습니다.' : '')
+    // 기간이 아직 안 끝났다는 사실은 반드시 드러내야 한다. 이걸 숨기면 진행 중인
+    // 달을 완료된 달과 같은 것으로 읽게 된다.
+    + (a.ongoing ? ' <b>아직 끝나지 않은 기간</b>이라 <b>' + a.effTo + '까지</b>로 계산했습니다.'
+        + ' 남은 날을 가용시간에 넣으면 가동률이 실제보다 낮게 나옵니다.' : '')
     + '</p>';
 
   // ── 월별 추이 ──
@@ -476,6 +518,8 @@ function render(a) {
     const maxU = Math.max(0.0001, ...a.trend.map(x => x.util));
     h += '<div class="sec"><h2>월별 가동률 추이</h2>'
       + '<p class="desc">달마다 평일 수가 다르므로 가용시간도 달마다 다시 셉니다. 그래서 달끼리 바로 비교됩니다. '
+      + '아직 안 끝난 달은 <b>오늘까지</b>만 계산합니다 — 남은 날을 가용시간에 넣으면 그 달만 낮게 나와 비교가 망가집니다. '
+      + '가동률은 비율이라 15일치와 30일치를 그대로 견줄 수 있습니다. '
       + '증감은 %p(퍼센트포인트)입니다 — 30%에서 33%가 되면 3%p 늘어난 것입니다.</p>'
       + '<table><thead><tr><th>월</th><th class="num">사용시간</th><th class="num">가용시간</th>'
       + '<th>가동률</th><th class="num">%</th><th class="num">전월 대비</th></tr></thead><tbody>';
@@ -488,7 +532,11 @@ function render(a) {
           : (d > 0 ? '▲' : '▼') + (Math.round(Math.abs(d) * 10) / 10).toFixed(1) + '%p';
       }
       h += '<tr>'
-        + '<td>' + m.ym + (m.partial ? ' <span style="color:var(--muted);font-size:12px">일부(' + m.from.slice(5) + '~' + m.to.slice(5) + ')</span>' : '') + '</td>'
+        + '<td>' + m.ym
+          + (m.ongoing
+              ? ' <span style="color:var(--muted);font-size:12px">진행 중 (~' + m.to.slice(5) + ', ' + m.days + '일)</span>'
+              : (m.partial ? ' <span style="color:var(--muted);font-size:12px">일부(' + m.from.slice(5) + '~' + m.to.slice(5) + ')</span>' : ''))
+          + '</td>'
         + '<td class="num">' + hrs(m.used) + '</td>'
         + '<td class="num">' + hrs(m.capacity) + '</td>'
         + '<td class="barcell"><div class="b"><i class="' + (m.util >= 0.85 ? 'hot' : '')
@@ -565,6 +613,7 @@ function render(a) {
 
   $('foot').innerHTML =
       '<b>가동률</b> = 사용시간 ÷ 가용시간. 가용시간은 운영시간(' + CONFIG.startHour + '~' + CONFIG.endHour + '시, 하루 ' + a.HPD + '시간) 기준입니다.<br>'
+    + '<b>기간이 아직 안 끝났으면 오늘까지만</b> 계산합니다. 남은 날을 가용시간에 넣으면 사용시간이 쌓일 시간이 없어 가동률이 실제보다 낮게 나오고, 완료된 달과 비교할 수 없게 됩니다. 앞으로 잡힌 예약은 실적이 아니므로 따로 셉니다.<br>'
     + '<b>전기 대비</b> = 바로 앞의 같은 길이 기간(' + a.prevFrom + ' ~ ' + a.prevTo + ')과 비교한 값입니다. '
     + '비율끼리의 차이라 %p 로 적습니다 — 30%에서 33%가 되면 3%p 늘어난 것입니다.'
     + (a.prevUtil == null ? ' 그 기간에 기록이 없어 이번에는 비교하지 않았습니다.' : '') + '<br>'
@@ -613,7 +662,12 @@ async function run() {
 
   // 바로 앞의 같은 길이 기간. 이번 달을 보면 지난 달과, 최근 3개월을 보면
   // 그 앞 3개월과 자동으로 비교된다. 한 번의 조회로 두 기간을 함께 받는다.
-  const span = Math.round((parseDate(to) - parseDate(from)) / 86400000) + 1;
+  //
+  // 길이는 '오늘까지'를 기준으로 잰다. 오늘이 7/15 인데 이번 달을 보면 실제로
+  // 집계되는 건 15일치이므로, 비교 상대도 직전 15일이라야 공평하다.
+  const today = todayStr();
+  const effTo = to > today ? today : to;
+  const span = Math.max(1, Math.round((parseDate(effTo) - parseDate(from)) / 86400000) + 1);
   const prevTo = dateAdd(from, -1);
   const prevFrom = dateAdd(prevTo, -(span - 1));
 
