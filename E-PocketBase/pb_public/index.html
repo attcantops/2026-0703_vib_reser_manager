@@ -103,12 +103,14 @@
     display: flex; align-items: center; justify-content: center;
     border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
     padding: 0 4px; white-space: nowrap;
-    min-height: var(--rowh);
+    /* min-height 가 아니라 height 로 못 박는다. 최소값이면 옆 칸 사정에 따라
+       줄이 늘었다 줄었다 하고, 시간 라벨과 예약 칸이 어긋난다. */
+    height: var(--rowh);
   }
   .cell {
     background: #fff; border-right: 1px solid var(--line);
     border-bottom: 1px dotted var(--line-soft);
-    min-height: var(--rowh); cursor: pointer;
+    height: var(--rowh); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     font-size: 13px; text-align: center; padding: 4px 6px; overflow: hidden;
   }
@@ -464,6 +466,15 @@ function groupsForDate(dateStr) {
 /* ============================================================
    표 렌더링
    ============================================================ */
+/* CSS 의 --rowh 를 실제 px 문자열로 읽는다. 못 읽으면 안전한 기본값. */
+let _rowh = null;
+function rowHeight() {
+  if (_rowh) return _rowh;
+  const v = getComputedStyle(document.documentElement).getPropertyValue('--rowh').trim();
+  _rowh = /^\d/.test(v) ? v : '42px';
+  return _rowh;
+}
+
 function renderDateLabel() {
   $('curLabel').textContent = (mode === 'day')
     ? curDate + ' (' + dowOf(curDate) + ')'
@@ -478,8 +489,12 @@ function renderTable() {
   t.style.gridTemplateColumns = '96px repeat(' + cols + ', minmax(84px, 1fr))';
   // 시간 행 높이를 값으로 고정한다. auto 로 두면 그 행에 무엇이 들어있느냐에 따라
   // 행마다 높이가 달라진다. 고정해 두면 예약이 있든 없든 모든 칸이 같은 크기다.
+  //
+  // 여기서 var(--rowh) 를 그대로 쓰지 않는다. 인라인 스타일의 repeat() 안에 든
+  // var() 는 브라우저가 값을 못 세우면 속성 전체를 버리고, 그러면 행 높이가
+  // auto 로 풀려 줄이 들쭉날쭉해진다. 실제 px 값을 읽어 넣는다.
   const hours = CONFIG.endHour - CONFIG.startHour;
-  t.style.gridTemplateRows = 'auto repeat(' + hours + ', var(--rowh))';
+  t.style.gridTemplateRows = 'auto repeat(' + hours + ', ' + rowHeight() + ')';
 
   const rowOf = (h) => h - CONFIG.startHour + 2;   // 1행 = 헤더
   const today = todayStr();
