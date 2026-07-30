@@ -7,7 +7,7 @@
 # 하는 일:
 #   1. PocketBase 0.39.9 (windows_amd64) 다운로드  — 이미 있으면 생략
 #   2. 앱 파일(pb_public, pb_migrations)을 ../E-PocketBase 에서 복사
-#   3. 방화벽 인바운드 8090 허용
+#   3. 방화벽 인바운드 8090 허용 + ping(ICMP) 응답 허용
 #   4. 부팅 시 자동시작 (작업 스케줄러, SYSTEM 계정)
 #   5. 기동 및 헬스체크
 #
@@ -64,6 +64,16 @@ if (-not (Get-NetFirewallRule -DisplayName "vibres $Port" -ErrorAction SilentlyC
     New-NetFirewallRule -DisplayName "vibres $Port" -Direction Inbound -Protocol TCP -LocalPort $Port -Action Allow | Out-Null
 } else {
     Write-Host "[3/5] 방화벽 규칙 이미 있음"
+}
+
+# ping 응답 허용. 윈도우는 ICMP 를 기본 차단하므로, 열지 않으면 다른 층에서 보낸 ping 이
+# 실패한다 — 서버가 멀쩡하고 라우팅도 되는데도 그렇다. 실제로 2026-07-30 같은 12층
+# 서브넷의 데탑에서 ping 이 실패했다(3389 은 열려 있었다). 그 실패를 "층간 라우팅 없음"
+# 으로 읽으면 쓸 수 있는 사내 호스팅을 버리고 외부 호스팅으로 가는 오판을 하게 된다.
+# 진단을 믿을 수 있게 만들려고 함께 연다. 서비스 동작에는 영향이 없다.
+if (-not (Get-NetFirewallRule -DisplayName "vibres ICMPv4" -ErrorAction SilentlyContinue)) {
+    Write-Host "      ping(ICMPv4 echo) 허용 규칙 추가 — 층간 진단용"
+    New-NetFirewallRule -DisplayName "vibres ICMPv4" -Direction Inbound -Protocol ICMPv4 -IcmpType 8 -Action Allow | Out-Null
 }
 
 # --- 4. 자동시작 등록 (작업 스케줄러) ----------------------------------
