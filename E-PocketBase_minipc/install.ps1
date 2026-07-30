@@ -1,4 +1,4 @@
-# =====================================================================
+﻿# =====================================================================
 # 진동시험기 예약 (E-PocketBase) — 미니PC(윈도우) 설치 스크립트
 #
 # 실행: 관리자 PowerShell에서
@@ -40,11 +40,16 @@ New-Item -ItemType Directory -Force $Root | Out-Null
 $exe = Join-Path $Root "pocketbase.exe"
 $needDownload = $true
 if (Test-Path $exe) {
-    $cur = (& $exe --version) -replace '[^\d.]',''
+    # --version 출력은 "pocketbase.exe version 0.39.9" 이고, pb_hooks 가 있으면
+    # 훅 로그 줄까지 섞여 나온다. 단순 문자 제거로는 비교가 깨져(항상 재다운로드)
+    # 버전 숫자만 정규식으로 뽑는다.
+    $cur = [regex]::Match(((& $exe --version) -join ' '), '\d+\.\d+\.\d+').Value
     if ($cur -eq $PbVersion) { $needDownload = $false; Write-Host "[1/5] PocketBase $PbVersion 이미 설치됨" }
 }
 if ($needDownload) {
     Write-Host "[1/5] PocketBase $PbVersion 다운로드..."
+    # 실행 중인 exe 는 잠겨 있어 덮어쓸 수 없다. 받기 전에 내린다(아래 5단계에서 재기동).
+    Get-Process pocketbase -ErrorAction SilentlyContinue | Stop-Process -Force
     $zip = Join-Path $env:TEMP "pb.zip"
     Invoke-WebRequest -Uri "https://github.com/pocketbase/pocketbase/releases/download/v$PbVersion/pocketbase_${PbVersion}_windows_amd64.zip" -OutFile $zip
     Expand-Archive -Path $zip -DestinationPath $Root -Force
@@ -52,11 +57,26 @@ if ($needDownload) {
 }
 
 # --- 2. 앱 파일 복사 (저장소 → 실행 위치) ------------------------------
+# Copy-Item 은 대상 폴더가 이미 있으면 "안으로" 복사해 pb_public\pb_public 처럼
+# 중첩되고, 최상위에는 낡은 파일이 남는다. 재실행을 안전하게 하려면 지우고 새로 뜬다.
+# (pb_data 는 여기 목록에 없다 — 예약 데이터는 절대 건드리지 않는다)
 Write-Host "[2/5] 앱 파일 복사 (pb_public, pb_migrations, pb_hooks)"
-Copy-Item -Recurse -Force (Join-Path $RepoApp "pb_public")     (Join-Path $Root "pb_public")
-Copy-Item -Recurse -Force (Join-Path $RepoApp "pb_migrations") (Join-Path $Root "pb_migrations")
-# 메일 알림 훅. SMTP 미설정이면 아무 일도 하지 않으므로 항상 함께 둔다.
-Copy-Item -Recurse -Force (Join-Path $RepoApp "pb_hooks")      (Join-Path $Root "pb_hooks")
+foreach ($d in "pb_public", "pb_migrations", "pb_hooks") {
+    $dst = Join-Path $Root $d
+    if (Test-Path $dst) { Remove-Item -Recurse -Force $dst }
+    Copy-Item -Recurse (Join-Path $RepoApp $d) $dst
+}
+
+# 화면 좌측 하단에 배포 커밋을 찍는다 (update.sh 와 같은 방식).
+# 없으면 "개발용(미배포)" 로 떠서 최신 화면인지 눈으로 판별할 수 없다.
+$index = Join-Path $Root "pb_public\index.html"
+$hash  = git -C $PSScriptRoot rev-parse --short HEAD 2>$null
+if ($hash) {
+    $stamp = "$hash ($(Get-Date -Format 'MM-dd HH:mm'))"
+    (Get-Content $index -Raw -Encoding utf8) -replace '__BUILD__', $stamp |
+        Set-Content $index -Encoding utf8 -NoNewline
+    Write-Host "      화면 버전 표시: $stamp"
+}
 
 # --- 3. 방화벽 --------------------------------------------------------
 if (-not (Get-NetFirewallRule -DisplayName "vibres $Port" -ErrorAction SilentlyContinue)) {
